@@ -761,17 +761,15 @@ struct TTEntry {
 - [x] Side-agnostic: evaluate trả về score từ góc nhìn `player`
 - [x] 59 unit tests pass (8 EvalCache + 6 RectTable + 8 PrefixSum + 6 Search + 5 MovegenOpt + 5 Movegen + 10 Board + 11 Bitboard)
 
-### ✅ Phase 2 hoàn thành — 2026-06-18
+### ✅ Phase 3 hoàn thành — 2026-06-18
 
 **Deliverables mới**:
-- `src/gen_geometry.cpp` — Offline tool: sinh data.bin (8415 rects, 1.04 MB)
-- `src/common/prefix_sum.hpp/cpp` — 2D prefix sum O(1) query
-- `src/engine/rect_table.hpp/cpp` — RectTable load + rect_id() formula + border masks
-- `src/engine/board.hpp/cpp` — EvalCache (40 bytes) incremental update, evaluate()
-- `src/engine/movegen.hpp/cpp` — generate_legal_moves_optimized (RectTable + PrefixSum)
-- `src/engine/search.hpp/cpp` — 1-ply greedy search, side-agnostic
-- `src/io/protocol.hpp/cpp` — Updated: RectTable + Search thay random
-- `data.bin` — Pre-computed geometry (~1.04 MB, cần copy vào build dir)
+- `src/engine/zobrist.hpp/cpp` — Zobrist hashing: 2200+ keys, compute() O(170)
+- `src/engine/tt.hpp/cpp` — TranspositionTable: 256K entries, always-replace, EXACT/ALPHA/BETA
+- `src/engine/search.hpp/cpp` — Negamax α-β + Iterative Deepening + killer moves + LMR
+- `src/io/protocol.hpp/cpp` — Updated: dùng iterative_deepening với 80% time budget
+- 79 unit tests, all passing
+- merge.py: 20 files → 38 KiB single-file compilable
 
 ---
 

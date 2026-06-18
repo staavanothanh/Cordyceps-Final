@@ -9,6 +9,7 @@ namespace cordyceps {
 
 class RectTable;
 class Search;
+class Zobrist;
 
 struct PassTracker {
     bool opp_has_passed{false};
@@ -35,6 +36,7 @@ public:
 private:
     Board board_;
     RectTable* table_{nullptr};
+    Zobrist* zobrist_{nullptr};
     Search* search_{nullptr};
     PassTracker pass_tracker_;
     int our_player_{0};

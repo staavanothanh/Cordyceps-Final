@@ -1,6 +1,7 @@
 #include "io/protocol.hpp"
 #include "engine/rect_table.hpp"
 #include "engine/search.hpp"
+#include "engine/zobrist.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -12,13 +13,15 @@ Protocol::Protocol() {
     
     table_ = new RectTable();
     if (table_->load("data.bin")) {
-        search_ = new Search(*table_);
+        zobrist_ = new Zobrist();
+        search_ = new Search(*table_, *zobrist_);
     }
 }
 
 Protocol::~Protocol() {
     delete table_;
     delete search_;
+    delete zobrist_;
 }
 
 void Protocol::run() {
@@ -73,17 +76,21 @@ void Protocol::handle_time(const std::string& line) {
     int our_time, opp_time;
     iss >> cmd >> our_time >> opp_time;
 
-    // Use search instead of random
     SideConfig config{};
     config.time_multiplier = 1.0f;
-    config.aggression = 0.5f;
+    config.aggression = i_am_first_ ? 0.3f : 0.7f;
     config.steal_bonus = 1.0f;
-    config.defense_bonus = 1.0f;
+    config.defense_bonus = i_am_first_ ? 2.0f : 1.0f;
     config.prefer_vertical = !i_am_first_;
+
+    // Allocate ~80% of remaining time for search
+    int search_time_ms = our_time * 8 / 10;
+    if (search_time_ms < 50) search_time_ms = 50;
+    if (search_time_ms > 9500) search_time_ms = 9500;
 
     Move best;
     if (search_) {
-        auto result = search_->simple_search(board_, config);
+        auto result = search_->iterative_deepening(board_, search_time_ms, config);
         best = result.move;
     } else {
         best = k_pass_move;

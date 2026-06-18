@@ -23,6 +23,9 @@ set(UNIT_TESTS
     tests/unit/test_recttable.cpp
     tests/unit/test_eval.cpp
     tests/unit/test_search.cpp
+    tests/unit/test_zobrist.cpp
+    tests/unit/test_tt.cpp
+    tests/unit/test_negamax.cpp
 )
 
 # GoogleTest via FetchContent
@@ -41,6 +44,8 @@ add_executable(cordyceps
     src/engine/movegen.cpp
     src/engine/rect_table.cpp
     src/engine/search.cpp
+    src/engine/zobrist.cpp
+    src/engine/tt.cpp
     src/io/protocol.cpp
     src/main.cpp
 )
@@ -54,6 +59,8 @@ add_executable(cordyceps_tests ${UNIT_TESTS}
     src/engine/movegen.cpp
     src/engine/rect_table.cpp
     src/engine/search.cpp
+    src/engine/zobrist.cpp
+    src/engine/tt.cpp
 )
 target_include_directories(cordyceps_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cordyceps_tests GTest::gtest GTest::gmock GTest::gtest_main)
