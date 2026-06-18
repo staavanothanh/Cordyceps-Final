@@ -68,14 +68,12 @@ def flatten_file(filepath, src_dir, processed, output_lines, system_includes, de
     processed.add(filepath)
     
     lines = read_file(filepath)
-    in_guard_block = False
     
     for line in lines:
         stripped = line.rstrip('\n\r')
         
         # Handle header guards / pragma once
         if is_header_guard_line(stripped):
-            in_guard_block = not in_guard_block
             continue
         
         # Handle local includes
@@ -96,6 +94,12 @@ def flatten_file(filepath, src_dir, processed, output_lines, system_includes, de
             continue
         
         output_lines.append(line)
+
+    # Also merge matching .cpp for this .hpp (to catch includes only in .cpp)
+    if filepath.endswith('.hpp'):
+        cpp_path = filepath[:-4] + '.cpp'
+        if os.path.exists(cpp_path) and cpp_path not in processed:
+            flatten_file(cpp_path, src_dir, processed, output_lines, system_includes, depth + 1)
 
 def main():
     if len(sys.argv) != 3:
