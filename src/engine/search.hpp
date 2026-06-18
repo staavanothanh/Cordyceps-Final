@@ -14,6 +14,18 @@ namespace cordyceps {
 struct SearchResult {
     Move move;
     int eval;
+    int max_depth{0};
+    long long tt_probes{0};
+    long long tt_hits{0};
+    long long nodes{0};
+};
+
+struct SearchBenchmark {
+    double avg_depth;
+    double avg_hit_rate;
+    double avg_nodes;
+    double avg_ms;
+    int samples;
 };
 
 class Search {
@@ -25,6 +37,9 @@ public:
     
     // Iterative deepening with negamax
     [[nodiscard]] SearchResult iterative_deepening(Board& board, int time_ms, const SideConfig& config) noexcept;
+
+    // Benchmark helper: run iterative_deepening on multiple random boards
+    [[nodiscard]] static SearchBenchmark benchmark(const RectTable& table, const Zobrist& zobrist, int time_ms, int samples) noexcept;
 
 private:
     const RectTable& table_;
@@ -40,6 +55,11 @@ private:
     int time_limit_ms_{0};
     int node_count_{0};
     bool timed_out_{false};
+
+    // TT statistics (per search)
+    long long tt_probes_{0};
+    long long tt_hits_{0};
+    int max_depth_reached_{0};
 
     [[nodiscard]] bool time_check() noexcept;
 

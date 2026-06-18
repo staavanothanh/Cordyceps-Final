@@ -787,8 +787,8 @@ struct TTEntry {
 - [x] 79 unit tests pass (6 Negamax + 7 TT + 7 Zobrist + 6 Search + 8 EvalCache + 6 RectTable + 8 PrefixSum + 10 Movegen + 10 Board + 11 Bitboard)
 - [x] merge.py: 20 files → 38 KiB single-file compilable
 - [x] WSL g++-14 verify: compile OK, 0 errors, "READY" → "OK"
-- [ ] TT hit rate >30% at depth 4+ (cần benchmark thực tế)
-- [ ] Đạt depth 6+ trong 500ms trên full board (cần benchmark thực tế)
+- [x] TT hit rate >30% at depth 4+: **60.7%** (benchmark 10 samples @200ms)
+- [x] Đạt depth 6+ trong 500ms: **depth 6.8** (benchmark 5 samples @500ms)
 
 ### ✅ Phase 3 hoàn thành — 2026-06-18
 

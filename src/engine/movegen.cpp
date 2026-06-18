@@ -85,6 +85,9 @@ std::vector<Move> generate_legal_moves_optimized(const Board& board, const RectT
     for (int i = 0; i < n; ++i) {
         const auto& ri = table.get_rect(i);
 
+        // Validate ranges
+        if (ri.r1 < 0 || ri.r2 >= k_rows || ri.c1 < 0 || ri.c2 >= k_cols) continue;
+
         // Fast sum check with prefix sum
         if (ps.sum(ri.r1, ri.c1, ri.r2, ri.c2) != k_target_sum) continue;
 

@@ -26,8 +26,8 @@ static_assert(sizeof(EvalCache) == 40, "EvalCache must be 40 bytes");
 struct UndoMove {
     Move mv;
     int  changed_count{0};
-    std::array<std::int8_t, 16> changed_indices;
-    std::array<std::int8_t, 16> old_values;
+    std::array<std::int8_t, k_cells> changed_indices;
+    std::array<std::int8_t, k_cells> old_values;
     Bitboard old_my_mask;
     Bitboard old_opp_mask;
     Bitboard old_live_mask;
@@ -60,10 +60,22 @@ struct Board {
     EvalCache eval_cache;
 
     // Cell access helpers
-    [[nodiscard]] std::int8_t& value_at(int r, int c) noexcept { return values[r * k_cols + c]; }
-    [[nodiscard]] const std::int8_t& value_at(int r, int c) const noexcept { return values[r * k_cols + c]; }
-    [[nodiscard]] std::int8_t& owner_at(int r, int c) noexcept { return owners[r * k_cols + c]; }
-    [[nodiscard]] const std::int8_t& owner_at(int r, int c) const noexcept { return owners[r * k_cols + c]; }
+    [[nodiscard]] std::int8_t& value_at(int r, int c) noexcept { 
+        if (r < 0 || r >= k_rows || c < 0 || c >= k_cols) return values[0];
+        return values[r * k_cols + c]; 
+    }
+    [[nodiscard]] const std::int8_t& value_at(int r, int c) const noexcept { 
+        if (r < 0 || r >= k_rows || c < 0 || c >= k_cols) return values[0];
+        return values[r * k_cols + c]; 
+    }
+    [[nodiscard]] std::int8_t& owner_at(int r, int c) noexcept { 
+        if (r < 0 || r >= k_rows || c < 0 || c >= k_cols) return owners[0];
+        return owners[r * k_cols + c]; 
+    }
+    [[nodiscard]] const std::int8_t& owner_at(int r, int c) const noexcept { 
+        if (r < 0 || r >= k_rows || c < 0 || c >= k_cols) return owners[0];
+        return owners[r * k_cols + c]; 
+    }
 
     // Operations
     void recalc_live_mask() noexcept;

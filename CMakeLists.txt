@@ -26,6 +26,7 @@ set(UNIT_TESTS
     tests/unit/test_zobrist.cpp
     tests/unit/test_tt.cpp
     tests/unit/test_negamax.cpp
+    tests/unit/test_benchmark.cpp
 )
 
 # GoogleTest via FetchContent

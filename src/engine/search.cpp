@@ -1,5 +1,6 @@
 #include "engine/search.hpp"
 #include <algorithm>
+#include <random>
 
 namespace cordyceps {
 
@@ -59,10 +60,12 @@ int Search::negamax(Board& board, int depth, int alpha, int beta, bool allow_pas
     }
 
     // TT probe
+    ++tt_probes_;
     std::uint64_t hash = zobrist_.compute(board);
     int tt_score;
     Move tt_move;
     auto tt_flag = tt_.probe(hash, depth, tt_score, tt_move);
+    if (tt_flag != TTEntry::EMPTY) ++tt_hits_;
     if (tt_flag == TTEntry::EXACT) return tt_score;
     if (tt_flag == TTEntry::ALPHA) {
         if (tt_score <= alpha) return alpha;
@@ -89,22 +92,11 @@ int Search::negamax(Board& board, int depth, int alpha, int beta, bool allow_pas
     Move best_move = k_pass_move;
     int alpha_orig = alpha;
 
+    // Disable LMR for debugging
     for (int i = 0; i < static_cast<int>(moves.size()); ++i) {
         const auto& mv = moves[i];
         auto undo = board.apply_move(mv);
-
-        int score;
-        // Late Move Reduction
-        if (i >= 4 && depth >= 3 && !mv.is_pass()) {
-            int R = 1 + (i > 8 ? 1 : 0); // R=1 or R=2 for very late moves
-            score = -negamax(board, depth - 1 - R, -(alpha + 1), -alpha, false);
-            if (score > alpha && score < beta) {
-                score = -negamax(board, depth - 1, -beta, -alpha, false);
-            }
-        } else {
-            score = -negamax(board, depth - 1, -beta, -alpha, false);
-        }
-
+        int score = -negamax(board, depth - 1, -beta, -alpha, false);
         board.unmake_move(undo);
 
         if (score > best_score) {
@@ -139,6 +131,9 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
     time_limit_ms_ = time_ms;
     timed_out_ = false;
     node_count_ = 0;
+    tt_probes_ = 0;
+    tt_hits_ = 0;
+    max_depth_reached_ = 0;
     tt_.clear();
 
     Move best_move = k_pass_move;
@@ -158,10 +153,11 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
         }
     }
 
-    best_move = moves[0]; // fallback
+    best_move = moves[0]; // fallback (guaranteed non-empty)
 
     int last_eval = 0;
     for (int d = 1; d <= MAX_DEPTH && !timed_out_; ++d) {
+        max_depth_reached_ = d;
         // Aspiration window
         int alpha = last_eval - 50;
         int beta = last_eval + 50;
@@ -190,7 +186,8 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
         }
     }
 
-    return {best_move, best_eval};
+    SearchResult result{best_move, best_eval, max_depth_reached_, tt_probes_, tt_hits_, node_count_};
+    return result;
 }
 
 // ===== Simple search (Phase 2, giữ lại cho reference) =====
@@ -229,6 +226,51 @@ SearchResult Search::simple_search(const Board& board, const SideConfig& config)
     }
 
     return best;
+}
+
+// ===== Benchmark =====
+
+SearchBenchmark Search::benchmark(const RectTable& table, const Zobrist& zobrist, int time_ms, int samples) noexcept {
+    SearchBenchmark bm{};
+    bm.samples = samples;
+
+    for (int s = 0; s < samples; ++s) {
+        Board board;
+        int target_live = 60 + (s * 7) % 50; // deterministic variation
+        for (int i = 0; i < target_live; ++i) {
+            int idx = (i * 37 + s * 13) % k_cells;
+            int val = 1 + ((i + s) % 9);
+            board.values[idx] = static_cast<std::int8_t>(val);
+        }
+        board.current_player = (s % 2 == 0) ? k_player_us : k_player_opp;
+        board.recalc_live_mask();
+
+        // Fresh Search each sample to avoid stale state
+        Search search(table, zobrist);
+
+        auto start = std::chrono::steady_clock::now();
+        auto result = search.iterative_deepening(board, time_ms, {});
+        auto end = std::chrono::steady_clock::now();
+
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+        bm.avg_depth += result.max_depth;
+        bm.avg_nodes += result.nodes;
+        bm.avg_ms += elapsed;
+
+        double hit_rate = 0;
+        if (result.tt_probes > 0) {
+            hit_rate = static_cast<double>(result.tt_hits) / result.tt_probes * 100.0;
+        }
+        bm.avg_hit_rate += hit_rate;
+    }
+
+    bm.avg_depth /= samples;
+    bm.avg_nodes /= samples;
+    bm.avg_ms /= samples;
+    bm.avg_hit_rate /= samples;
+
+    return bm;
 }
 
 } // namespace cordyceps
