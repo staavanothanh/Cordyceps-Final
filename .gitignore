@@ -1,0 +1,42 @@
+# Build artifacts
+build/
+submission/
+
+# Reference engines (not part of this project)
+_ref-*/
+
+# Binary files
+*.exe
+*.dll
+*.pdb
+*.bin
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+
+# GoogleTest (fetched by CMake)
+_deps/
+
+# Data files (temporary)
+*.jsonl
+*.csv
+training_data.csv
+
+# Misc
+logs/
+*.tmp
