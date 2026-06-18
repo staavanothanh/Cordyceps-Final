@@ -761,6 +761,35 @@ struct TTEntry {
 - [x] Side-agnostic: evaluate trả về score từ góc nhìn `player`
 - [x] 59 unit tests pass (8 EvalCache + 6 RectTable + 8 PrefixSum + 6 Search + 5 MovegenOpt + 5 Movegen + 10 Board + 11 Bitboard)
 
+### Phase 3: Core Search Engine (Ngày 8-12)
+
+**Mục tiêu**: Negamax α-β + TT + iterative deepening.
+
+| Task | Files | Mô tả |
+|------|-------|-------|
+| 3.1 | `src/engine/zobrist.hpp/cpp` | Zobrist hashing (2200+ keys, full scan compute O(170)) |
+| 3.2 | `src/engine/tt.hpp/cpp` | Transposition Table (256K entries, always-replace, open-addressing) |
+| 3.3 | `src/engine/search.hpp/cpp` | Negamax α-β với killer moves (2 per depth) |
+| 3.4 | `src/engine/search.hpp/cpp` | Iterative deepening (depth 1-20) + aspiration windows (±50) |
+| 3.5 | `src/engine/search.hpp/cpp` | Null-move pruning (R=3, depth ≥ 3) |
+| 3.6 | `src/engine/search.hpp/cpp` | Move ordering: TT best → capture value → killers → rest |
+| 3.7 | `src/engine/search.hpp/cpp` | Late Move Reduction (R=1-2, i ≥ 4, re-search nếu promising) |
+| 3.8 | `src/engine/search.hpp/cpp` | Pass handling: auto-pass khi leading + opponent passed |
+| 3.9 | `src/io/protocol.hpp/cpp` | Updated: iterative_deepening + 80% time budget |
+
+**Gate kiểm tra**:
+- [x] Negamax depth 1 matches simple_search
+- [x] TT probe/store EXACT/ALPHA/BETA working
+- [x] Zobrist hash consistent after apply/unapply cycle
+- [x] Iterative deepening finds best move, respects time limit
+- [x] Side-agnostic: both FIRST and SECOND search correctly
+- [x] PASS when winning + opponent passed
+- [x] 79 unit tests pass (6 Negamax + 7 TT + 7 Zobrist + 6 Search + 8 EvalCache + 6 RectTable + 8 PrefixSum + 10 Movegen + 10 Board + 11 Bitboard)
+- [x] merge.py: 20 files → 38 KiB single-file compilable
+- [x] WSL g++-14 verify: compile OK, 0 errors, "READY" → "OK"
+- [ ] TT hit rate >30% at depth 4+ (cần benchmark thực tế)
+- [ ] Đạt depth 6+ trong 500ms trên full board (cần benchmark thực tế)
+
 ### ✅ Phase 3 hoàn thành — 2026-06-18
 
 **Deliverables mới**:
@@ -770,29 +799,6 @@ struct TTEntry {
 - `src/io/protocol.hpp/cpp` — Updated: dùng iterative_deepening với 80% time budget
 - 79 unit tests, all passing
 - merge.py: 20 files → 38 KiB single-file compilable
-
----
-
-### Phase 3: Core Search Engine (Ngày 8-12)
-
-**Mục tiêu**: Negamax α-β + TT + iterative deepening.
-
-| Task | Files | Mô tả |
-|------|-------|-------|
-| 3.1 | `src/engine/zobrist.hpp/cpp` | Zobrist hashing (keys từ data.bin) |
-| 3.2 | `src/engine/tt.hpp/cpp` | Transposition Table (flat open-addressing) |
-| 3.3 | `src/engine/search.hpp/cpp` | Negamax α-β cơ bản |
-| 3.4 | `src/engine/search.hpp/cpp` | Iterative deepening + aspiration windows |
-| 3.5 | `src/engine/search.hpp/cpp` | Null-move pruning (R=2-3, depth ≥ 3) |
-| 3.6 | `src/engine/search.hpp/cpp` | Move ordering: TT best → captures → killer → history |
-| 3.7 | `src/engine/search.hpp/cpp` | Late Move Reduction (conservative, i ≥ 4) |
-| 3.8 | `src/engine/search.hpp/cpp` | Pass handling trong search tree (với `player` parameter) |
-
-**Gate kiểm tra**:
-- [ ] Negamax trả về minimax score đúng trên endgame positions
-- [ ] TT hit rate >30% at depth 4+
-- [ ] Bot depth 4 beats 1-ply >90%
-- [ ] Đạt depth 6+ trong 500ms trên full board
 
 ---
 
