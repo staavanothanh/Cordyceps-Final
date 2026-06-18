@@ -7,10 +7,13 @@
 
 namespace cordyceps {
 
+class RectTable;
+class Search;
+
 struct PassTracker {
     bool opp_has_passed{false};
     bool we_have_passed{false};
-    int  last_pass_player{0}; // 0=reset, 1=us, -1=opp
+    int  last_pass_player{0};
 
     [[nodiscard]] bool is_game_over() const noexcept {
         return opp_has_passed && we_have_passed;
@@ -26,12 +29,15 @@ struct PassTracker {
 class Protocol {
 public:
     Protocol();
+    ~Protocol();
     void run();
 
 private:
     Board board_;
+    RectTable* table_{nullptr};
+    Search* search_{nullptr};
     PassTracker pass_tracker_;
-    int our_player_{0}; // 1=FIRST, -1=SECOND (set from INIT)
+    int our_player_{0};
     bool i_am_first_{false};
 
     void handle_ready();
@@ -39,9 +45,6 @@ private:
     void handle_time(const std::string& line);
     void handle_opp(const std::string& line);
     void handle_finish();
-
-    [[nodiscard]] Move pick_random_move() const noexcept;
-    [[nodiscard]] bool should_we_pass() const noexcept;
 
     void write_move(const Move& mv) const;
 };

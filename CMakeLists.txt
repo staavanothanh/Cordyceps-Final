@@ -18,6 +18,11 @@ set(UNIT_TESTS
     tests/unit/test_bitboard.cpp
     tests/unit/test_board.cpp
     tests/unit/test_movegen.cpp
+    tests/unit/test_movegen_optimized.cpp
+    tests/unit/test_prefixsum.cpp
+    tests/unit/test_recttable.cpp
+    tests/unit/test_eval.cpp
+    tests/unit/test_search.cpp
 )
 
 # GoogleTest via FetchContent
@@ -31,8 +36,11 @@ FetchContent_MakeAvailable(googletest)
 # Main executable
 add_executable(cordyceps
     src/common/bitboard.cpp
+    src/common/prefix_sum.cpp
     src/engine/board.cpp
     src/engine/movegen.cpp
+    src/engine/rect_table.cpp
+    src/engine/search.cpp
     src/io/protocol.cpp
     src/main.cpp
 )
@@ -41,8 +49,11 @@ target_include_directories(cordyceps PRIVATE ${CMAKE_SOURCE_DIR}/src)
 # Test executable
 add_executable(cordyceps_tests ${UNIT_TESTS} 
     src/common/bitboard.cpp
+    src/common/prefix_sum.cpp
     src/engine/board.cpp
     src/engine/movegen.cpp
+    src/engine/rect_table.cpp
+    src/engine/search.cpp
 )
 target_include_directories(cordyceps_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cordyceps_tests GTest::gtest GTest::gmock GTest::gtest_main)

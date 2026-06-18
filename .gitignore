@@ -40,3 +40,5 @@ training_data.csv
 # Misc
 logs/
 *.tmp
+
+.commandcode/

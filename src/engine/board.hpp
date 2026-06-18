@@ -8,6 +8,21 @@
 
 namespace cordyceps {
 
+struct EvalCache {
+    int my_territory{0};
+    int opp_territory{0};
+    int my_corners{0};
+    int opp_corners{0};
+    int my_edges{0};
+    int opp_edges{0};
+    int live_adj_my{0};
+    int live_adj_opp{0};
+    int connectivity_my{0};
+    int connectivity_opp{0};
+};
+
+static_assert(sizeof(EvalCache) == 40, "EvalCache must be 40 bytes");
+
 struct UndoMove {
     Move mv;
     int  changed_count{0};
@@ -21,6 +36,7 @@ struct UndoMove {
     int old_opp_score{0};
     int old_consecutive_passes{0};
     int old_current_player{0};
+    EvalCache old_eval_cache;
 };
 
 struct Board {
@@ -39,6 +55,9 @@ struct Board {
     int live_count{0};
     int current_player{0};          // 1=Cordyceps, -1=opponent
     int consecutive_passes{0};
+
+    // Eval cache
+    EvalCache eval_cache;
 
     // Cell access helpers
     [[nodiscard]] std::int8_t& value_at(int r, int c) noexcept { return values[r * k_cols + c]; }
@@ -59,5 +78,10 @@ private:
 };
 
 } // namespace cordyceps
+
+// Free function evaluate (side-agnostic)
+namespace cordyceps {
+[[nodiscard]] int evaluate(const Board& board, int player) noexcept;
+}
 
 #endif // CORDYCEPS_ENGINE_BOARD_HPP

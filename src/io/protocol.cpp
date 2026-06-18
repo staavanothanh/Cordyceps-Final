@@ -1,15 +1,24 @@
 #include "io/protocol.hpp"
-#include "engine/movegen.hpp"
+#include "engine/rect_table.hpp"
+#include "engine/search.hpp"
 #include <iostream>
 #include <sstream>
-#include <chrono>
-#include <random>
 
 namespace cordyceps {
 
 Protocol::Protocol() {
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
+    
+    table_ = new RectTable();
+    if (table_->load("data.bin")) {
+        search_ = new Search(*table_);
+    }
+}
+
+Protocol::~Protocol() {
+    delete table_;
+    delete search_;
 }
 
 void Protocol::run() {
@@ -37,25 +46,21 @@ void Protocol::handle_ready() {
 }
 
 void Protocol::handle_init(const std::string& line) {
-    // INIT <seed10digits>... <side>
-    // Format: "INIT <10 seeds> FIRST|SECOND"
     std::istringstream iss(line);
     std::string cmd;
-    iss >> cmd; // "INIT"
+    iss >> cmd;
 
-    // Read 10 seed values
     for (int i = 0; i < 10; ++i) {
         unsigned long long seed_part;
         iss >> seed_part;
     }
 
-    // Read side
     std::string side;
     iss >> side;
     
     i_am_first_ = (side == "FIRST");
     our_player_ = i_am_first_ ? k_player_us : k_player_opp;
-    board_.current_player = k_player_us; // FIRST always starts
+    board_.current_player = k_player_us;
     
     pass_tracker_.reset();
     
@@ -63,35 +68,39 @@ void Protocol::handle_init(const std::string& line) {
 }
 
 void Protocol::handle_time(const std::string& line) {
-    // TIME <our_ms> <opp_ms>
     std::istringstream iss(line);
     std::string cmd;
     int our_time, opp_time;
     iss >> cmd >> our_time >> opp_time;
 
-    // Check if opponent has passed and we should pass too
-    if (should_we_pass()) {
-        write_move(k_pass_move);
-        board_.apply_move(k_pass_move);
-        pass_tracker_.we_have_passed = true;
-        return;
+    // Use search instead of random
+    SideConfig config{};
+    config.time_multiplier = 1.0f;
+    config.aggression = 0.5f;
+    config.steal_bonus = 1.0f;
+    config.defense_bonus = 1.0f;
+    config.prefer_vertical = !i_am_first_;
+
+    Move best;
+    if (search_) {
+        auto result = search_->simple_search(board_, config);
+        best = result.move;
+    } else {
+        best = k_pass_move;
     }
 
-    // Phase 1: random move
-    Move best = pick_random_move();
-    
     if (best.is_pass()) {
         pass_tracker_.we_have_passed = true;
+        pass_tracker_.last_pass_player = our_player_;
     } else {
         pass_tracker_.reset();
     }
-    
+
     board_.apply_move(best);
     write_move(best);
 }
 
 void Protocol::handle_opp(const std::string& line) {
-    // OPP <side> <r1> <c1> <r2> <c2> <ms>
     std::istringstream iss(line);
     std::string cmd, side;
     int r1, c1, r2, c2, ms;
@@ -101,44 +110,21 @@ void Protocol::handle_opp(const std::string& line) {
                   static_cast<std::int8_t>(r2), static_cast<std::int8_t>(c2)};
 
     if (opp_move.is_pass()) {
-        // BTC BUG: detect duplicate pass from same player
-        if (pass_tracker_.last_pass_player == -1) {
-            return; // Ignore duplicate
+        if (pass_tracker_.last_pass_player != k_player_opp) {
+            pass_tracker_.opp_has_passed = true;
+            pass_tracker_.last_pass_player = k_player_opp;
+            board_.consecutive_passes = 1;
         }
-        pass_tracker_.opp_has_passed = true;
-        pass_tracker_.last_pass_player = -1;
     } else {
         pass_tracker_.last_pass_player = 0;
         pass_tracker_.opp_has_passed = false;
+        board_.consecutive_passes = 0;
     }
-    
+
     board_.apply_move(opp_move);
 }
 
 void Protocol::handle_finish() {
-    // Clean exit
-}
-
-Move Protocol::pick_random_move() const noexcept {
-    auto moves = generate_legal_moves(board_);
-    
-    if (moves.empty()) {
-        return k_pass_move;
-    }
-    
-    // Thread-local RNG for deterministic-ish behavior
-    static thread_local std::mt19937 rng(42);
-    std::uniform_int_distribution<size_t> dist(0, moves.size() - 1);
-    return moves[dist(rng)];
-}
-
-bool Protocol::should_we_pass() const noexcept {
-    if (pass_tracker_.opp_has_passed) {
-        int margin = board_.score_from_perspective(our_player_);
-        if (margin > 0) return true;      // Lock win
-        if (margin <= 0) return false;    // Tied/losing → keep fighting
-    }
-    return false;
 }
 
 void Protocol::write_move(const Move& mv) const {
