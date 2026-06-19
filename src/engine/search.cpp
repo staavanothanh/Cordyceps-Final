@@ -1,4 +1,5 @@
 #include "engine/search.hpp"
+#include "engine/timeman.hpp"
 #include <algorithm>
 #include <random>
 #include <cstring>
@@ -31,6 +32,17 @@ int Search::order_score(const Board& board, const Move& mv, int depth) noexcept 
     // History heuristic: successful moves get priority
     int h = history_[mv.r1][mv.c1][mv.r2][mv.c2];
     if (h > 0) return 50 + h;
+
+    // Side-aware: vertical vs horizontal preference
+    if (prefer_vertical_) {
+        int height = mv.r2 - mv.r1 + 1;
+        int width = mv.c2 - mv.c1 + 1;
+        if (height > width) return 25;  // vertical bonus
+    } else if (aggression_ < 0.4f) {
+        int height = mv.r2 - mv.r1 + 1;
+        int width = mv.c2 - mv.c1 + 1;
+        if (width >= height) return 25; // horizontal bonus (FIRST, defensive)
+    }
 
     // Score: total mushroom value in the rect
     int sum = 0;
@@ -178,6 +190,12 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
     max_depth_reached_ = 0;
     tt_.clear();
 
+    // Store side config
+    prefer_vertical_ = config.prefer_vertical;
+    aggression_ = config.aggression;
+    steal_bonus_ = config.steal_bonus;
+    defense_bonus_ = config.defense_bonus;
+
     // Clear history and killers
     std::memset(history_, 0, sizeof(history_));
     for (int i = 0; i < 64; ++i) {
@@ -202,8 +220,12 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
 
     best_move = moves[0];
 
+    GamePhase phase = detect_phase(board);
+    bool endgame = (phase == GamePhase::kEndgame);
+    int max_d = endgame ? 64 : MAX_DEPTH; // endgame: enable extremely deep search
+
     int last_eval = 0;
-    for (int d = 1; d <= MAX_DEPTH && !timed_out_; ++d) {
+    for (int d = 1; d <= max_d && !timed_out_; ++d) {
         max_depth_reached_ = d;
         int alpha = last_eval - 100;
         int beta = last_eval + 100;

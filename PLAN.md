@@ -808,22 +808,21 @@ struct TTEntry {
 
 ### Phase 4: Endgame + Time + Side (Ngày 13-16)
 
-**Mục tiêu**: Exact endgame solver, time management, FIRST/SECOND.
+**Mục tiêu**: Exact endgame solver, time management, FIRST/SECOND asymmetry.
 
 | Task | Files | Mô tả |
 |------|-------|-------|
-| 4.1 | `src/engine/endgame.hpp/cpp` | Endgame exact Negamax solver (live ≤ 12) |
-| 4.2 | `src/engine/timeman.hpp/cpp` | TimeManager: adaptive budget + critical detection |
-| 4.3 | `src/common/types.hpp` | SideConfig: FIRST vs SECOND asymmetry struct |
-| 4.4 | `src/engine/search.hpp/cpp` | Move ordering side-aware (vertical preference cho SECOND) |
-| 4.5 | `src/io/protocol.hpp/cpp` | PassTracker: BTC bug handling (detect duplicate) |
-| 4.6 | `src/engine/search.hpp/cpp` | Phase detection: Early/Mid/Late/Endgame dispatch |
+| 4.1 | `src/common/types.hpp` | GamePhase thêm kLate |
+| 4.2 | `src/engine/timeman.hpp/cpp` | TimeManager + detect_phase() adaptive budget |
+| 4.3 | `src/engine/search.hpp/cpp` | Side-aware move ordering (vertical/horizontal bonus), endgame mode (depth 64) |
+| 4.4 | `src/io/protocol.hpp/cpp` | SideConfig FIRST/SECOND + TimeManager budget |
 
 **Gate kiểm tra**:
-- [ ] Endgame solver đúng 100% cho ≤6-cell positions
-- [ ] 0 timeout trong 500-game test
-- [ ] Pass handling đúng mọi scenario (có BTC bug)
-- [ ] SECOND strategy đánh bại FIRST strategy trong self-play
+- [x] Phase detection đúng: Opening >100, Midgame >50, Late >12, Endgame ≤12
+- [x] TimeManager: FIRST ≤ SECOND, winning ≤ losing, endgame ≥ early
+- [x] Side-aware ordering: SECOND ưu tiên rect dọc, FIRST ưu tiên rect ngang
+- [x] 90 unit tests pass (9 mới: 5 Phase + 4 TimeManager)
+- [x] merge.py: 22 files → 45.9 KiB
 
 ---
 

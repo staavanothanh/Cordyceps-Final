@@ -36,7 +36,7 @@ struct Move {
 
 constexpr Move k_pass_move{-1, -1, -1, -1};
 
-enum class GamePhase { kOpening, kMidgame, kEndgame };
+enum class GamePhase { kOpening, kMidgame, kLate, kEndgame };
 
 struct SideConfig {
     float time_multiplier;

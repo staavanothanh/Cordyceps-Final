@@ -61,6 +61,12 @@ private:
     long long tt_hits_{0};
     int max_depth_reached_{0};
 
+    // Side-aware configuration (set per iterative_deepening call)
+    bool prefer_vertical_{false};
+    float aggression_{0.5f};
+    float steal_bonus_{1.0f};
+    float defense_bonus_{1.0f};
+
     // History heuristic: tracks which (r1,c1,r2,c2) pairs are successful
     int history_[k_rows][k_cols][k_rows][k_cols]{};
 

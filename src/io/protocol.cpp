@@ -2,6 +2,7 @@
 #include "engine/rect_table.hpp"
 #include "engine/search.hpp"
 #include "engine/zobrist.hpp"
+#include "engine/timeman.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -77,16 +78,17 @@ void Protocol::handle_time(const std::string& line) {
     iss >> cmd >> our_time >> opp_time;
 
     SideConfig config{};
-    config.time_multiplier = 1.0f;
+    config.time_multiplier = i_am_first_ ? 1.0f : 1.5f;
     config.aggression = i_am_first_ ? 0.3f : 0.7f;
     config.steal_bonus = 1.0f;
     config.defense_bonus = i_am_first_ ? 2.0f : 1.0f;
     config.prefer_vertical = !i_am_first_;
 
-    // Allocate ~80% of remaining time for search
-    int search_time_ms = our_time * 8 / 10;
-    if (search_time_ms < 50) search_time_ms = 50;
-    if (search_time_ms > 9500) search_time_ms = 9500;
+    // Use TimeManager for adaptive budget
+    TimeManager tm;
+    GamePhase phase = detect_phase(board_);
+    int margin = board_.score_from_perspective(our_player_);
+    int search_time_ms = tm.get_budget(phase, config, our_time, margin);
 
     Move best;
     if (search_) {
@@ -99,6 +101,7 @@ void Protocol::handle_time(const std::string& line) {
     if (best.is_pass()) {
         pass_tracker_.we_have_passed = true;
         pass_tracker_.last_pass_player = our_player_;
+        board_.consecutive_passes = 2; // force terminal
     } else {
         pass_tracker_.reset();
     }

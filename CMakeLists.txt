@@ -27,6 +27,7 @@ set(UNIT_TESTS
     tests/unit/test_tt.cpp
     tests/unit/test_negamax.cpp
     tests/unit/test_benchmark.cpp
+    tests/unit/test_timeman.cpp
 )
 
 # GoogleTest via FetchContent
@@ -45,6 +46,7 @@ add_executable(cordyceps
     src/engine/movegen.cpp
     src/engine/rect_table.cpp
     src/engine/search.cpp
+    src/engine/timeman.cpp
     src/engine/zobrist.cpp
     src/engine/tt.cpp
     src/io/protocol.cpp
@@ -60,6 +62,7 @@ add_executable(cordyceps_tests ${UNIT_TESTS}
     src/engine/movegen.cpp
     src/engine/rect_table.cpp
     src/engine/search.cpp
+    src/engine/timeman.cpp
     src/engine/zobrist.cpp
     src/engine/tt.cpp
 )
