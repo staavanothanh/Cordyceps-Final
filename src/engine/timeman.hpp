@@ -6,22 +6,25 @@
 
 namespace cordyceps {
 
-// Detect game phase based on live_count
+// Detect game phase based on live_count (mushroom-bot thresholds)
+// live > 32  -> Opening
+// 20-32      -> Midgame
+// 13-19      -> Late
+// ≤ 12       -> Endgame
 [[nodiscard]] GamePhase detect_phase(const Board& board) noexcept;
+[[nodiscard]] int estimate_moves_left(int live_count) noexcept;
 
 class TimeManager {
 public:
     TimeManager() noexcept = default;
 
-    // Calculate search budget for this turn
-    // remaining_ms: total remaining game time (from TIME message)
-    // margin: current score from perspective of player (positive = winning)
-    [[nodiscard]] int get_budget(GamePhase phase, const SideConfig& config,
+    // Per-move budget = remaining_ms * phase_pct / 100 * side_mult * margin_factor
+    // phase_pct: 6% opening, 10% midgame, 12% late, 18% endgame
+    [[nodiscard]] int get_budget(int live_count, const SideConfig& config,
                                   int remaining_ms, int margin) const noexcept;
 
 private:
-    [[nodiscard]] static float phase_weight(GamePhase phase) noexcept;
-    [[nodiscard]] static float margin_weight(int margin) noexcept;
+    [[nodiscard]] static float margin_factor(int margin) noexcept;
 };
 
 } // namespace cordyceps

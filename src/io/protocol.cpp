@@ -86,9 +86,9 @@ void Protocol::handle_time(const std::string& line) {
 
     // Use TimeManager for adaptive budget
     TimeManager tm;
-    GamePhase phase = detect_phase(board_);
     int margin = board_.score_from_perspective(our_player_);
-    int search_time_ms = tm.get_budget(phase, config, our_time, margin);
+    int live_count = board_.live_count;
+    int search_time_ms = tm.get_budget(live_count, config, our_time, margin);
 
     Move best;
     if (search_) {

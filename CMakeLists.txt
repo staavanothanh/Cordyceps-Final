@@ -28,6 +28,7 @@ set(UNIT_TESTS
     tests/unit/test_negamax.cpp
     tests/unit/test_benchmark.cpp
     tests/unit/test_timeman.cpp
+    tests/unit/test_time_benchmark.cpp
 )
 
 # GoogleTest via FetchContent

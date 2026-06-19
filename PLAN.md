@@ -818,11 +818,19 @@ struct TTEntry {
 | 4.4 | `src/io/protocol.hpp/cpp` | SideConfig FIRST/SECOND + TimeManager budget |
 
 **Gate kiểm tra**:
-- [x] Phase detection đúng: Opening >100, Midgame >50, Late >12, Endgame ≤12
-- [x] TimeManager: FIRST ≤ SECOND, winning ≤ losing, endgame ≥ early
+- [x] Phase detection đúng: Opening >32, Midgame 20-32, Late 13-19, Endgame ≤12 (sửa từ 100/50/12)
+- [x] TimeManager: budget = remaining × phase_pct/100 × side_mult × margin_factor
+  - FIRST time_mult=1.0, SECOND time_mult=1.5
+  - Opening 6%, Midgame 10%, Late 12%, Endgame 18%
+  - Ratio SECOND/FIRST: 1.3-2.0x (từ log data: ~1.55x)
+  - Emergency <500ms: 15ms fixed
 - [x] Side-aware ordering: SECOND ưu tiên rect dọc, FIRST ưu tiên rect ngang
-- [x] 90 unit tests pass (9 mới: 5 Phase + 4 TimeManager)
-- [x] merge.py: 22 files → 45.9 KiB
+- [x] 100 unit tests pass (19 mới: Phase + TimeManager + TimeBudget benchmark)
+- [x] merge.py: 22 files → 46.9 KiB
+
+**Work in progress**:
+- [ ] Game simulation benchmark: FIRST avg 293ms/move, 73% pool; SECOND avg 346ms/move, 87% pool
+- [ ] Verify time allocation matches log data via tournament testing
 
 ---
 

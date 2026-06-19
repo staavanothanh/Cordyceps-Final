@@ -258,7 +258,7 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
 
 // ===== Simple search =====
 
-SearchResult Search::simple_search(const Board& board, const SideConfig& config) noexcept {
+SearchResult Search::simple_search(const Board& board, [[maybe_unused]] const SideConfig& config) noexcept {
     auto moves = generate_legal_moves_optimized(board, table_);
     int player = board.current_player;
 
