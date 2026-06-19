@@ -32,6 +32,7 @@ set(UNIT_TESTS
     tests/unit/test_protocol_init.cpp
     tests/unit/test_protocol_flow.cpp
     tests/unit/test_turn2_crash.cpp
+    tests/unit/test_eval_upgrade.cpp
 )
 
 # GoogleTest via FetchContent

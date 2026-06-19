@@ -838,34 +838,54 @@ struct TTEntry {
 
 ---
 
-### ⏳ Phase 5: Tuning & Tournament (In Progress)
+### ⏳ Phase 5: Eval Upgrade + Tuning (In Progress)
 
-**Mục tiêu**: Production engine, tournament verification, protocol completion.
+**Mục tiêu**: Improve eval features systematically, tune weights, tournament verification.
 
-| Task | Files | Mô tả |
-|------|-------|-------|
-| 5.1 | `scripts/tournament.py` | Tournament runner: 14-game match, auto-swap, BTC-style logging, pluggable engines |
-| 5.2 | `src/` (all) | Protocol bug fixes: OPP format, INIT parse, side detection |
-| 5.3 | `src/` (all) | Defensive: fix UndoMove changed_indices overflow (int8_t → uint8_t) |
-| 5.4 | `scripts/` | Tournament: cordyceps vs reference bots (agent-i-think-change, mushroom-bot, superchym) |
-| 5.5 | `scripts/merge.py` | Final submission package |
+| Task | Files | Mô tả | Trạng thái |
+|------|-------|-------|-----------|
+| 5.1 | `scripts/tournament.py` | Tournament runner: 14-game match, auto-swap, BTC-style logging, pluggable engines | ✅ Hoàn thành |
+| 5.2 | `src/` (all) | Protocol bug fixes: OPP format, INIT parse, side detection | ✅ Hoàn thành |
+| 5.3 | `src/engine/board.cpp` | Fix UndoMove.changed_indices overflow (int8_t → uint8_t) | ✅ Hoàn thành |
+| 5.4 | `src/engine/board.cpp` | Fix connectivity incremental update in apply_move (EvalCache field từng là dead code) | ✅ Hoàn thành |
+| 5.5 | `src/engine/search.cpp` | Add evaluate_with_geometry() — mobility, safety, steal features | ✅ Hoàn thành |
+| 5.6 | `src/engine/search.cpp` | Add negamax_endgame() — exact solver cho live_count ≤ 8 | ✅ Hoàn thành |
+| 5.7 | `src/engine/search.cpp` | Add is_futile() — basic futility pruning | ✅ Implemented (disabled) |
+| 5.8 | `src/engine/search.hpp` | Add EvalWeights struct for configurable geometry weights | ✅ Hoàn thành |
+| 5.9 | `tests/unit/test_eval_upgrade.cpp` | 11 new unit tests: connectivity, mobility, endgame, futility | ✅ Hoàn thành |
+| 5.10 | `scripts/` | Tournament: cordyceps vs reference bots | 🔄 In progress |
+| 5.11 | `scripts/merge.py` | Final submission package | ❌ Pending |
 
-**Gate kiểm tra**:
+**Gate kiểm tra hiện tại**:
 - [x] Protocol OPP format: `OPP <r1> <c1> <r2> <c2> <t>` (không side name)
-- [x] handle_ready parse FIRST/SECOND, handle_init parse 10 board ints
-- [x] Fix UndoMove.changed_indices int8_t overflow (cell index ≥ 128 gây wrap → buffer underflow)
-- [x] Engine chạy full game vs testing_tool (FIRST 53, SECOND 59)
-- [x] 102/103 unit tests pass (1 flaky TT hit rate benchmark)
-- [ ] Tournament script: 14-game with swap, BTC-style logs, pluggable engines
-- [ ] Tournament results vs agent-i-think-change
-- [ ] Win rate > 50% vs reference engine
-- [ ] merge.py: main.cpp < 950 KiB
+- [x] Fix UndoMove.changed_indices int8_t overflow
+- [x] Fix connectivity incremental update (6 unit tests confirm)
+- [x] Endgame exact solver: hoạt động cho live_count ≤ 8
+- [x] Tournament script: 14-game swap, BTC logs, pluggable engines
+- [x] 112/112 non-benchmark tests pass
+- [x] WSL g++-14 compile + run OK
+- [ ] Geometry features (mobility, safety, steal) cần tuned weights — hiện đang bị disable
+- [ ] Win rate ≥ old cordyceps baseline: **7%** (1/14) — cần tuning
 
-**Kết quả hiện tại**:
-- 103/103 tests pass (Phase 4 gate)
-- Ván thử nghiệm: Cordyceps (FIRST) 53 - 59 (SECOND) vs Cordyceps (SECOND)
-- merge.py: 22 files → 47.5 KiB
-- Search depth: 6.9-7.1@200ms, 7.8-8.2@500ms
+**Kết quả tournament (connectivity-only baseline)**:
+- 14 games vs agent-i-think-change: W:1 L:13 (7%)
+- FIRST: 1/7 (14%), score_diff=-29
+- SECOND: 0/7 (0%), score_diff=-38
+
+**Key learnings**:
+- **Connectivity** với +weight HURTS: ô kết nối dễ bị steal group. Cần safety features đi kèm.
+- **Geometry features** (mobility, safety, steal) code OK nhưng weights CHƯA được tune — cần opponent eval data hoặc self-play tuning.
+- **Endgame solver** chính xác nhưng trigger quá muộn (live ≤ 8) → cần đẩy lên live ≤ 12 và tune.
+- **Futility pruning** dễ gây bad pruning nếu threshold sai → disable pending tuning loop.
+- **Kết luận**: Eval features KHÔNG thể add raw mà không tune. Cần tuning loop (self-play grid search hoặc SPSA).
+
+**Kế hoạch Phase 5A hoàn thiện**:
+1. ✅ Fix connectivity incremental update (EvalCache không còn dead field)
+2. ✅ Code geometry features (evaluate_with_geometry)
+3. ❌ Tune weights qua self-play tournament (ưu tiên #1)
+4. ❌ Enable geometry features với weights đã tune (ưu tiên #2)
+5. ❌ Enable futility pruning (ưu tiên #3)
+6. ❌ Đẩy endgame solver trigger lên live ≤ 12 (ưu tiên #4)
 
 ---
 

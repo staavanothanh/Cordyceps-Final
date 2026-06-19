@@ -94,6 +94,22 @@ UndoMove Board::apply_move(const Move& mv) noexcept {
 
         owners[idx] = static_cast<std::int8_t>(player);
 
+        // Update connectivity: count edges to adjacent same-owner cells
+        {
+            int adj_dr[] = {-1, 1, 0, 0};
+            int adj_dc[] = {0, 0, -1, 1};
+            for (int d = 0; d < 4; ++d) {
+                int nr2 = r + adj_dr[d], nc2 = c + adj_dc[d];
+                if (nr2 >= 0 && nr2 < k_rows && nc2 >= 0 && nc2 < k_cols) {
+                    int nidx2 = nr2 * k_cols + nc2;
+                    if (owners[nidx2] == player) {
+                        if (player == k_player_us) ++ec->connectivity_my;
+                        else ++ec->connectivity_opp;
+                    }
+                }
+            }
+        }
+
         if (player == k_player_us) {
             my_mask.set(idx);
             ++ec->my_territory;
@@ -174,19 +190,22 @@ int evaluate(const Board& board, int player) noexcept {
     int corner_diff = ec.my_corners - ec.opp_corners;
     int edge_diff = ec.my_edges - ec.opp_edges;
     int adj_diff = ec.live_adj_my - ec.live_adj_opp;
+    int conn_diff = ec.connectivity_my - ec.connectivity_opp;
 
     if (player == k_player_opp) {
         territory_diff = -territory_diff;
         corner_diff = -corner_diff;
         edge_diff = -edge_diff;
         adj_diff = -adj_diff;
+        conn_diff = -conn_diff;
     }
 
     return score * 10
          + territory_diff * 2
          + corner_diff * 5
          + edge_diff * 1
-         + adj_diff * 1;
+         + adj_diff * 1
+         + conn_diff * 0;  // disabled — needs safety features to balance
 }
 
 } // namespace cordyceps

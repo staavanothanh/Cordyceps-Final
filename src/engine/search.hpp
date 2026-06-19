@@ -2,6 +2,7 @@
 #define CORDYCEPS_ENGINE_SEARCH_HPP
 
 #include <chrono>
+#include <cstring>
 #include "common/types.hpp"
 #include "engine/board.hpp"
 #include "engine/rect_table.hpp"
@@ -10,6 +11,19 @@
 #include "engine/tt.hpp"
 
 namespace cordyceps {
+
+struct EvalWeights {
+    // Static eval weights (applied to evaluate())
+    // -- not configurable, uses the hardcoded multipliers in evaluate()
+
+    // Geometry eval weights (set to 0 to disable, tuned on later)
+    int mobility = 0;       // per legal move difference (capped)
+    int safe_cell = 0;      // per safe cell (our territory not in threat)
+    int steal = 0;          // per steal opportunity (rects with only opponent cells)
+};
+
+// Default weights tuned for balanced play
+constexpr EvalWeights k_default_weights{};
 
 struct SearchResult {
     Move move;
@@ -78,8 +92,21 @@ private:
     // Negamax α-β
     int negamax(Board& board, int depth, int alpha, int beta, bool allow_pass) noexcept;
 
+    // Negamax α-β with geometry-enhanced leaf evaluation
+    int negamax_geo(Board& board, int depth, int alpha, int beta, bool allow_pass) noexcept;
+
+    // Endgame exact solver (no depth limit, for low live_count)
+    int negamax_endgame(Board& board, int alpha, int beta, bool allow_pass) noexcept;
+
+    // Geometry-enhanced leaf evaluation (static + mobility + safety/vulnerability/steal)
+    [[nodiscard]] int evaluate_with_geometry(const Board& board, int player,
+                                              const std::vector<Move>& moves) noexcept;
+
     // Move ordering: sort moves before search loop
     void sort_moves(Board& board, std::vector<Move>& moves, int depth, const Move& tt_move) noexcept;
+
+    // Eval weights
+    EvalWeights ew_{};
 };
 
 } // namespace cordyceps
