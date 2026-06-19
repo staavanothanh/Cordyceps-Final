@@ -1,6 +1,5 @@
 # Build artifacts
 build/
-submission/
 
 # Reference engines (not part of this project)
 _ref-*/
