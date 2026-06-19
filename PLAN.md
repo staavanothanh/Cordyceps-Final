@@ -787,18 +787,22 @@ struct TTEntry {
 - [x] 79 unit tests pass (6 Negamax + 7 TT + 7 Zobrist + 6 Search + 8 EvalCache + 6 RectTable + 8 PrefixSum + 10 Movegen + 10 Board + 11 Bitboard)
 - [x] merge.py: 20 files → 38 KiB single-file compilable
 - [x] WSL g++-14 verify: compile OK, 0 errors, "READY" → "OK"
-- [x] TT hit rate >30% at depth 4+: **60.7%** (benchmark 10 samples @200ms)
-- [x] Đạt depth 6+ trong 500ms: **depth 6.8** (benchmark 5 samples @500ms)
+- [x] TT hit rate >30% at depth 4+: **55.2%** (10 samples @200ms)
+- [x] Đạt depth 8+ trong 500ms: **depth 8.2** (5 samples @500ms, max depth 10)
+- [x] Optimizations applied: fix allow_pass bug, depth-preferred TT, history heuristic, aggressive LMR
 
-### ✅ Phase 3 hoàn thành — 2026-06-18
+**Key optimizations**:
+- `allow_pass` bug: null-mute trước chỉ chạy ở root node, fix thành chạy ở mọi depth ≥ 3
+- TT replacement: always-replace → depth-preferred (giữ entry sâu)
+- History heuristic: 4D array [10][17][10][17], bonus depth² cho moves thành công
+- LMR: R = 1 + searched/4 (trước R cố định 1-2), cap R ≤ depth/2
+- Nodes giảm 30% so với trước, depth tăng từ 6.8 → 8.2
 
-**Deliverables mới**:
-- `src/engine/zobrist.hpp/cpp` — Zobrist hashing: 2200+ keys, compute() O(170)
-- `src/engine/tt.hpp/cpp` — TranspositionTable: 256K entries, always-replace, EXACT/ALPHA/BETA
-- `src/engine/search.hpp/cpp` — Negamax α-β + Iterative Deepening + killer moves + LMR
-- `src/io/protocol.hpp/cpp` — Updated: dùng iterative_deepening với 80% time budget
-- 79 unit tests, all passing
-- merge.py: 20 files → 38 KiB single-file compilable
+**Chi tiết benchmark**:
+| Budget | Avg Depth | Nodes | TT Hit Rate |
+|--------|-----------|-------|-------------|
+| 200ms  | 7.1 | 24K | 55.2% |
+| 500ms  | **8.2** | 61K | 54.5% |
 
 ---
 

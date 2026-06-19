@@ -23,6 +23,13 @@ TTEntry::Flag TranspositionTable::probe(std::uint64_t key, int depth, int& score
 void TranspositionTable::store(std::uint64_t key, int depth, TTEntry::Flag flag, int score, const Move& mv) noexcept {
     int idx = key & mask_;
     auto& entry = table_[idx];
+
+    // Depth-preferred: keep deeper entry from a different position
+    // Always replace same position
+    if (entry.flag != TTEntry::EMPTY && entry.key != key && entry.depth > depth) {
+        return;
+    }
+
     entry.key = key;
     entry.depth = static_cast<std::int8_t>(depth);
     entry.flag = flag;

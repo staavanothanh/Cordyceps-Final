@@ -61,6 +61,9 @@ private:
     long long tt_hits_{0};
     int max_depth_reached_{0};
 
+    // History heuristic: tracks which (r1,c1,r2,c2) pairs are successful
+    int history_[k_rows][k_cols][k_rows][k_cols]{};
+
     [[nodiscard]] bool time_check() noexcept;
 
     // Move ordering score
