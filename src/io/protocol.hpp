@@ -42,7 +42,7 @@ private:
     int our_player_{0};
     bool i_am_first_{false};
 
-    void handle_ready();
+    void handle_ready(const std::string& line);
     void handle_init(const std::string& line);
     void handle_time(const std::string& line);
     void handle_opp(const std::string& line);

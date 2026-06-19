@@ -249,7 +249,19 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
         Move tt_move;
         auto flag = tt_.probe(hash, d, tt_score, tt_move);
         if (tt_move != k_pass_move && !tt_move.is_pass() && flag != TTEntry::EMPTY) {
-            best_move = tt_move;
+            // Validate TT move: check if it's in the legal move list
+            bool valid = false;
+            for (const auto& mv : moves) {
+                if (mv.r1 == tt_move.r1 && mv.c1 == tt_move.c1 &&
+                    mv.r2 == tt_move.r2 && mv.c2 == tt_move.c2) {
+                    valid = true;
+                    break;
+                }
+            }
+            if (valid) {
+                best_move = tt_move;
+            }
+            // If invalid, keep current best_move (moves[0])
         }
     }
 

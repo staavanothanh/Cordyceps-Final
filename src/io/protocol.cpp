@@ -5,6 +5,7 @@
 #include "engine/timeman.hpp"
 #include <iostream>
 #include <sstream>
+#include <string>
 
 namespace cordyceps {
 
@@ -31,7 +32,7 @@ void Protocol::run() {
         if (line.empty()) continue;
 
         if (line.starts_with("READY")) {
-            handle_ready();
+            handle_ready(line);
         } else if (line.starts_with("INIT")) {
             handle_init(line);
         } else if (line.starts_with("TIME")) {
@@ -39,13 +40,16 @@ void Protocol::run() {
         } else if (line.starts_with("OPP")) {
             handle_opp(line);
         } else if (line.starts_with("FINISH")) {
-            handle_finish();
             break;
         }
     }
 }
 
-void Protocol::handle_ready() {
+void Protocol::handle_ready(const std::string& line) {
+    i_am_first_ = (line.find("FIRST") != std::string::npos);
+    our_player_ = i_am_first_ ? k_player_us : k_player_opp;
+    board_.current_player = k_player_us;
+    pass_tracker_.reset();
     std::cout << "OK\n" << std::flush;
 }
 
@@ -54,21 +58,22 @@ void Protocol::handle_init(const std::string& line) {
     std::string cmd;
     iss >> cmd;
 
-    for (int i = 0; i < 10; ++i) {
-        unsigned long long seed_part;
-        iss >> seed_part;
+    board_ = Board{};
+    for (int r = 0; r < k_rows; ++r) {
+        unsigned long long row_val;
+        if (!(iss >> row_val)) break;
+
+        for (int c = k_cols - 1; c >= 0; --c) {
+            int digit = static_cast<int>(row_val % 10);
+            row_val /= 10;
+            int idx = r * k_cols + c;
+            board_.values[idx] = static_cast<std::int8_t>(digit);
+        }
     }
 
-    std::string side;
-    iss >> side;
-    
-    i_am_first_ = (side == "FIRST");
-    our_player_ = i_am_first_ ? k_player_us : k_player_opp;
-    board_.current_player = k_player_us;
-    
-    pass_tracker_.reset();
-    
-    std::cout << "OK\n" << std::flush;
+    board_.recalc_live_mask();
+    board_.my_mask = Bitboard::empty();
+    board_.opp_mask = Bitboard::empty();
 }
 
 void Protocol::handle_time(const std::string& line) {
@@ -84,7 +89,6 @@ void Protocol::handle_time(const std::string& line) {
     config.defense_bonus = i_am_first_ ? 2.0f : 1.0f;
     config.prefer_vertical = !i_am_first_;
 
-    // Use TimeManager for adaptive budget
     TimeManager tm;
     int margin = board_.score_from_perspective(our_player_);
     int live_count = board_.live_count;
@@ -99,9 +103,10 @@ void Protocol::handle_time(const std::string& line) {
     }
 
     if (best.is_pass()) {
-        pass_tracker_.we_have_passed = true;
-        pass_tracker_.last_pass_player = our_player_;
-        board_.consecutive_passes = 2; // force terminal
+        if (pass_tracker_.last_pass_player != our_player_) {
+            pass_tracker_.we_have_passed = true;
+            pass_tracker_.last_pass_player = our_player_;
+        }
     } else {
         pass_tracker_.reset();
     }
@@ -111,10 +116,11 @@ void Protocol::handle_time(const std::string& line) {
 }
 
 void Protocol::handle_opp(const std::string& line) {
+    // OPP format: OPP <r1> <c1> <r2> <c2> <t>
     std::istringstream iss(line);
-    std::string cmd, side;
+    std::string cmd;
     int r1, c1, r2, c2, ms;
-    iss >> cmd >> side >> r1 >> c1 >> r2 >> c2 >> ms;
+    iss >> cmd >> r1 >> c1 >> r2 >> c2 >> ms;
 
     Move opp_move{static_cast<std::int8_t>(r1), static_cast<std::int8_t>(c1),
                   static_cast<std::int8_t>(r2), static_cast<std::int8_t>(c2)};
@@ -123,12 +129,10 @@ void Protocol::handle_opp(const std::string& line) {
         if (pass_tracker_.last_pass_player != k_player_opp) {
             pass_tracker_.opp_has_passed = true;
             pass_tracker_.last_pass_player = k_player_opp;
-            board_.consecutive_passes = 1;
         }
     } else {
         pass_tracker_.last_pass_player = 0;
         pass_tracker_.opp_has_passed = false;
-        board_.consecutive_passes = 0;
     }
 
     board_.apply_move(opp_move);

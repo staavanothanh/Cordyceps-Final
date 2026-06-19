@@ -29,6 +29,9 @@ set(UNIT_TESTS
     tests/unit/test_benchmark.cpp
     tests/unit/test_timeman.cpp
     tests/unit/test_time_benchmark.cpp
+    tests/unit/test_protocol_init.cpp
+    tests/unit/test_protocol_flow.cpp
+    tests/unit/test_turn2_crash.cpp
 )
 
 # GoogleTest via FetchContent
@@ -66,6 +69,7 @@ add_executable(cordyceps_tests ${UNIT_TESTS}
     src/engine/timeman.cpp
     src/engine/zobrist.cpp
     src/engine/tt.cpp
+    src/io/protocol.cpp
 )
 target_include_directories(cordyceps_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(cordyceps_tests GTest::gtest GTest::gmock GTest::gtest_main)
