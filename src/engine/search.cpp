@@ -475,7 +475,7 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
     GamePhase phase = detect_phase(board);
     bool endgame = (phase == GamePhase::kEndgame);
 
-    if (endgame && board.live_count <= 8) {
+    if (endgame && board.live_count <= 12) {
         // Deep endgame: exact solver
         int score = negamax_endgame(board, -INF, INF, true);
         if (timed_out_ && best_move.is_pass()) {
@@ -512,6 +512,7 @@ SearchResult Search::iterative_deepening(Board& board, int time_ms, const SideCo
         int alpha = last_eval - 100;
         int beta = last_eval + 100;
 
+        // Using regular negamax — negamax_geo available for future optimization
         int score = negamax(board, d, alpha, beta, true);
         if (timed_out_) break;
 

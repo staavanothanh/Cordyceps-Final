@@ -16,10 +16,10 @@ struct EvalWeights {
     // Static eval weights (applied to evaluate())
     // -- not configurable, uses the hardcoded multipliers in evaluate()
 
-    // Geometry eval weights (set to 0 to disable, tuned on later)
-    int mobility = 0;       // per legal move difference (capped)
-    int safe_cell = 0;      // per safe cell (our territory not in threat)
-    int steal = 0;          // per steal opportunity (rects with only opponent cells)
+    // Geometry eval weights (enabled with conservative values)
+    int mobility = 1;       // per legal move difference (capped)
+    int safe_cell = 1;      // per safe cell (our territory not in threat)
+    int steal = 2;          // per steal opportunity (rects with only opponent cells)
 };
 
 // Default weights tuned for balanced play

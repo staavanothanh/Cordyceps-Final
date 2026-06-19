@@ -200,12 +200,14 @@ int evaluate(const Board& board, int player) noexcept {
         conn_diff = -conn_diff;
     }
 
-    return score * 10
-         + territory_diff * 2
-         + corner_diff * 5
-         + edge_diff * 1
-         + adj_diff * 1
-         + conn_diff * 0;  // disabled — needs safety features to balance
+    // Temp weights: rebalanced from reference engines (superchym + mushroom-bot)
+    // Score no longer dominates — territory now carries more weight
+    return score * 3           // was 10 — reduced from 70% to ~30% of eval
+         + territory_diff * 3  // was 2 — increased importance
+         + corner_diff * 8     // was 5 — corners are valuable (reference: 18-22 weight)
+         + edge_diff * 2       // was 1 — edges matter more
+         + adj_diff * 3        // was 1 — proxy for recapture/vulnerability
+         + conn_diff * 0;      // disabled — connectivity hurts without safety features
 }
 
 } // namespace cordyceps

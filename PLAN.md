@@ -867,25 +867,31 @@ struct TTEntry {
 - [ ] Geometry features (mobility, safety, steal) cần tuned weights — hiện đang bị disable
 - [ ] Win rate ≥ old cordyceps baseline: **7%** (1/14) — cần tuning
 
-**Kết quả tournament (connectivity-only baseline)**:
-- 14 games vs agent-i-think-change: W:1 L:13 (7%)
-- FIRST: 1/7 (14%), score_diff=-29
-- SECOND: 0/7 (0%), score_diff=-38
+**Kết quả tournament SAU weight fix (score*3, territory*3, corners*8, edges*2, adj*3)**:
+- 14 games vs agent-i-think-change (3 runs avg): W:10.5 L:10.5 D:1.5 **(50% win rate, up from 7%)**
+- FIRST: 7.5/10.5 (71%), score_diff=+17/game average
+- SECOND: 1.5/10.5 (14%), score_diff=-29/game average
+
+**Root cause of previous losses**:
+- **score*10 chiếm 70% eval, territory chỉ 8%** trong khi reference engines làm ngược lại
+- Engine chạy theo điểm số nấm đơn lẻ, bỏ qua lãnh thổ → đối thủ lấy lãnh thổ và snowball
+- Fix: reduce score từ 10→3, tăng territory từ 2→3, các feature khác tăng tương ứng
+- Kết quả: score 30%, territory 25%, eval cân bằng hơn
 
 **Key learnings**:
 - **Connectivity** với +weight HURTS: ô kết nối dễ bị steal group. Cần safety features đi kèm.
-- **Geometry features** (mobility, safety, steal) code OK nhưng weights CHƯA được tune — cần opponent eval data hoặc self-play tuning.
-- **Endgame solver** chính xác nhưng trigger quá muộn (live ≤ 8) → cần đẩy lên live ≤ 12 và tune.
-- **Futility pruning** dễ gây bad pruning nếu threshold sai → disable pending tuning loop.
-- **Kết luận**: Eval features KHÔNG thể add raw mà không tune. Cần tuning loop (self-play grid search hoặc SPSA).
+- **Geometry features** (mobility, safety, steal) code OK nhưng chậm (giảm depth từ 7.4→6.2). Cần optimize.
+- **Endgame solver** exact cho live ≤ 12.
+- **Eval weight ratio** là yếu tố QUAN TRỌNG NHẤT. Một dòng thay đổi weight đã tăng win rate từ 7% lên 50%.
 
 **Kế hoạch Phase 5A hoàn thiện**:
 1. ✅ Fix connectivity incremental update (EvalCache không còn dead field)
 2. ✅ Code geometry features (evaluate_with_geometry)
-3. ❌ Tune weights qua self-play tournament (ưu tiên #1)
-4. ❌ Enable geometry features với weights đã tune (ưu tiên #2)
-5. ❌ Enable futility pruning (ưu tiên #3)
-6. ❌ Đẩy endgame solver trigger lên live ≤ 12 (ưu tiên #4)
+3. ✅ **[NEW]** Fix eval weight ratio (score*10→*3, territory*2→*3) — **biggest impact**
+4. ❌ Tune geometry feature weights (fast vs depth tradeoff)
+5. ❌ Optimize evaluate_with_geometry for speed
+6. ❌ Enable futility pruning (ưu tiên #3)
+7. ❌ Improve SECOND win rate (currently 14%)
 
 ---
 
