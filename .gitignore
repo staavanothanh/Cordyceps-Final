@@ -40,5 +40,6 @@ training_data.csv
 # Misc
 logs/
 *.tmp
+.git_commit_msg.txt
 
 .commandcode/
