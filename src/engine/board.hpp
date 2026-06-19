@@ -114,6 +114,19 @@ namespace cordyceps {
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
                       int adj_w, int recapture_w, int vulnerability_w) noexcept;
 void clear_tune_weights() noexcept;
+
+// Load eval weights from config file (format: "FIRST=w0..w6", "SECOND=w0..w6")
+// Returns true on success, false if file not found/parse error.
+// Output params unchanged on failure.
+[[nodiscard]] bool load_weights_from_file(const char* path,
+                                           EvalWeights& first_out,
+                                           EvalWeights& second_out) noexcept;
+
+// Deploy side-specific weights via set_tune_weights().
+// FIRST uses first_weights, SECOND uses second_weights.
+void deploy_side_weights(bool is_first,
+                         const EvalWeights& first_weights,
+                         const EvalWeights& second_weights) noexcept;
 }
 
 #endif // CORDYCEPS_ENGINE_BOARD_HPP

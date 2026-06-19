@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "engine/board.hpp"
 
 namespace cordyceps {
@@ -207,6 +208,41 @@ void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
 
 void clear_tune_weights() noexcept {
     g_tune_active = false;
+}
+
+bool load_weights_from_file(const char* path,
+                             EvalWeights& first_out,
+                             EvalWeights& second_out) noexcept {
+    FILE* f = std::fopen(path, "r");
+    if (!f) return false;
+
+    char line[128];
+    int parsed_ok = 0;
+    while (std::fgets(line, sizeof(line), f)) {
+        // Skip comments/empty
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+
+        int w[7];
+        if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d",
+                        &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
+            parsed_ok++;
+        } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
+            parsed_ok++;
+        }
+    }
+    std::fclose(f);
+    return parsed_ok >= 2;
+}
+
+void deploy_side_weights(bool is_first,
+                          const EvalWeights& first_weights,
+                          const EvalWeights& second_weights) noexcept {
+    const auto& w = is_first ? first_weights : second_weights;
+    set_tune_weights(w.score, w.territory, w.corners, w.edges,
+                     w.live_adj, w.recapture, w.vulnerability);
 }
 
 int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept {

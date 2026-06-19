@@ -1,4 +1,6 @@
 #include "io/protocol.hpp"
+#include <cstdio>
+#include <cstdlib>
 #include "engine/rect_table.hpp"
 #include "engine/search.hpp"
 #include "engine/zobrist.hpp"
@@ -17,6 +19,16 @@ Protocol::Protocol() {
     if (table_->load("data.bin")) {
         zobrist_ = new Zobrist();
         search_ = new Search(*table_, *zobrist_);
+    }
+    load_eval_weights();
+}
+
+void Protocol::load_eval_weights() {
+    const char* env_path = std::getenv("WEIGHTS_CFG");
+    const char* path = env_path ? env_path : "best_weights.cfg";
+    weights_loaded_ = load_weights_from_file(path, first_weights_, second_weights_);
+    if (weights_loaded_) {
+        std::fprintf(stderr, "[weights] loaded from %s\n", path);
     }
 }
 
@@ -110,6 +122,11 @@ void Protocol::handle_time(const std::string& line) {
     config.steal_bonus = 1.0f;
     config.defense_bonus = i_am_first_ ? 2.0f : 1.0f;
     config.prefer_vertical = !i_am_first_;
+
+    // Deploy side-specific eval weights before search
+    if (weights_loaded_) {
+        deploy_side_weights(i_am_first_, first_weights_, second_weights_);
+    }
 
     TimeManager tm;
     int margin = board_.score_from_perspective(our_player_);

@@ -95,4 +95,75 @@ TEST(SideWeights, EvaluatePerspectiveFlipWithCustomWeights) {
     EXPECT_EQ(us, -opp);  // perspective flip must negate
 }
 
+// ── Test 6: load_weights_from_file parses format correctly ──
+TEST(SideWeights, LoadWeightsFromFile) {
+    // Create a temp config file
+    FILE* f = std::fopen("test_weights.cfg", "w");
+    ASSERT_NE(f, nullptr);
+    std::fprintf(f, "FIRST=5 10 15 3 4 2 1\n");
+    std::fprintf(f, "SECOND=10 5 8 4 6 3 -2\n");
+    std::fclose(f);
+
+    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    bool ok = load_weights_from_file("test_weights.cfg", fw, sw);
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(fw.score, 5);
+    EXPECT_EQ(fw.territory, 10);
+    EXPECT_EQ(fw.corners, 15);
+    EXPECT_EQ(fw.edges, 3);
+    EXPECT_EQ(fw.live_adj, 4);
+    EXPECT_EQ(fw.recapture, 2);
+    EXPECT_EQ(fw.vulnerability, 1);
+    EXPECT_EQ(sw.score, 10);
+    EXPECT_EQ(sw.territory, 5);
+    EXPECT_EQ(sw.vulnerability, -2);
+
+    std::remove("test_weights.cfg");
+}
+
+// ── Test 7: deploy_side_weights affects evaluate() ──
+TEST(SideWeights, DeploySideWeightsAffectsEval) {
+    // Create a temp config
+    FILE* f = std::fopen("test_deploy.cfg", "w");
+    ASSERT_NE(f, nullptr);
+    std::fprintf(f, "FIRST=10 0 0 0 0 0 0\n");  // score*10 only
+    std::fprintf(f, "SECOND=0 10 0 0 0 0 0\n");  // territory*10 only
+    std::fclose(f);
+
+    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    ASSERT_TRUE(load_weights_from_file("test_deploy.cfg", fw, sw));
+
+    // Deploy as FIRST
+    deploy_side_weights(true, fw, sw);
+    Board board;
+    board.current_player = k_player_us;
+    board.my_score = 10;
+    board.opp_score = 5;
+    board.eval_cache.my_territory = 4;
+    board.eval_cache.opp_territory = 2;
+    // FIRST: score*10 = 5*10 = 50
+    int first_eval = evaluate(board, k_player_us);
+    EXPECT_EQ(first_eval, 5 * 10);
+
+    // Deploy as SECOND
+    deploy_side_weights(false, fw, sw);
+    // SECOND: territory*10 = (4-2)*10 = 20
+    int second_eval = evaluate(board, k_player_us);
+    EXPECT_EQ(second_eval, (4 - 2) * 10);
+
+    clear_tune_weights();
+    std::remove("test_deploy.cfg");
+}
+
+// ── Test 8: Missing file returns false, baseline unchanged ──
+TEST(SideWeights, MissingFileReturnsFalse) {
+    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    EvalWeights fw_before = fw, sw_before = sw;
+    bool ok = load_weights_from_file("nonexistent.cfg", fw, sw);
+    EXPECT_FALSE(ok);
+    // Weights unchanged
+    EXPECT_EQ(fw.score, fw_before.score);
+    EXPECT_EQ(sw.score, sw_before.score);
+}
+
 } // namespace cordyceps

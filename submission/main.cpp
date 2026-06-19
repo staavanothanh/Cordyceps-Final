@@ -2,14 +2,14 @@
 #include <cstdint>
 #include <array>
 #include <bit>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 #include <span>
-#include <cstdio>
 #include <chrono>
 #include <cstring>
 #include <random>
 #include <algorithm>
-#include <cstdlib>
 #include <iostream>
 #include <sstream>
 
@@ -247,6 +247,19 @@ namespace cordyceps {
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
                       int adj_w, int recapture_w, int vulnerability_w) noexcept;
 void clear_tune_weights() noexcept;
+
+// Load eval weights from config file (format: "FIRST=w0..w6", "SECOND=w0..w6")
+// Returns true on success, false if file not found/parse error.
+// Output params unchanged on failure.
+[[nodiscard]] bool load_weights_from_file(const char* path,
+                                           EvalWeights& first_out,
+                                           EvalWeights& second_out) noexcept;
+
+// Deploy side-specific weights via set_tune_weights().
+// FIRST uses first_weights, SECOND uses second_weights.
+void deploy_side_weights(bool is_first,
+                         const EvalWeights& first_weights,
+                         const EvalWeights& second_weights) noexcept;
 }
 
 
@@ -459,6 +472,41 @@ void clear_tune_weights() noexcept {
     g_tune_active = false;
 }
 
+bool load_weights_from_file(const char* path,
+                             EvalWeights& first_out,
+                             EvalWeights& second_out) noexcept {
+    FILE* f = std::fopen(path, "r");
+    if (!f) return false;
+
+    char line[128];
+    int parsed_ok = 0;
+    while (std::fgets(line, sizeof(line), f)) {
+        // Skip comments/empty
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+
+        int w[7];
+        if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d",
+                        &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
+            parsed_ok++;
+        } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
+            parsed_ok++;
+        }
+    }
+    std::fclose(f);
+    return parsed_ok >= 2;
+}
+
+void deploy_side_weights(bool is_first,
+                          const EvalWeights& first_weights,
+                          const EvalWeights& second_weights) noexcept {
+    const auto& w = is_first ? first_weights : second_weights;
+    set_tune_weights(w.score, w.territory, w.corners, w.edges,
+                     w.live_adj, w.recapture, w.vulnerability);
+}
+
 int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept {
     const auto& ec = board.eval_cache;
 
@@ -551,7 +599,11 @@ private:
     PassTracker pass_tracker_;
     int our_player_{0};
     bool i_am_first_{false};
+    EvalWeights first_weights_;
+    EvalWeights second_weights_;
+    bool weights_loaded_{false};
 
+    void load_eval_weights();
     void handle_ready(const std::string& line);
     void handle_init(const std::string& line);
     void handle_time(const std::string& line);
@@ -1725,6 +1777,16 @@ Protocol::Protocol() {
         zobrist_ = new Zobrist();
         search_ = new Search(*table_, *zobrist_);
     }
+    load_eval_weights();
+}
+
+void Protocol::load_eval_weights() {
+    const char* env_path = std::getenv("WEIGHTS_CFG");
+    const char* path = env_path ? env_path : "best_weights.cfg";
+    weights_loaded_ = load_weights_from_file(path, first_weights_, second_weights_);
+    if (weights_loaded_) {
+        std::fprintf(stderr, "[weights] loaded from %s\n", path);
+    }
 }
 
 Protocol::~Protocol() {
@@ -1817,6 +1879,11 @@ void Protocol::handle_time(const std::string& line) {
     config.steal_bonus = 1.0f;
     config.defense_bonus = i_am_first_ ? 2.0f : 1.0f;
     config.prefer_vertical = !i_am_first_;
+
+    // Deploy side-specific eval weights before search
+    if (weights_loaded_) {
+        deploy_side_weights(i_am_first_, first_weights_, second_weights_);
+    }
 
     TimeManager tm;
     int margin = board_.score_from_perspective(our_player_);

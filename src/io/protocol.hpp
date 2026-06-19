@@ -41,7 +41,11 @@ private:
     PassTracker pass_tracker_;
     int our_player_{0};
     bool i_am_first_{false};
+    EvalWeights first_weights_;
+    EvalWeights second_weights_;
+    bool weights_loaded_{false};
 
+    void load_eval_weights();
     void handle_ready(const std::string& line);
     void handle_init(const std::string& line);
     void handle_time(const std::string& line);

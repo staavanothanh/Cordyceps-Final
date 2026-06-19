@@ -1,0 +1,11 @@
+feat: add eval weight deploy mechanism (load from file + side-specific)
+
+- Add load_weights_from_file() parsing "FIRST=w0..w6" / "SECOND=w0..w6"
+- Add deploy_side_weights() calling set_tune_weights() per side
+- Protocol loads from WEIGHTS_CFG env var or best_weights.cfg at startup
+- Protocol deploys side-specific weights before each search in handle_time
+- Add 3 TDD tests: file parsing, deploy effect, missing file fallback
+- 125/126 tests pass (pre-existing flaky TT benchmark)
+- best_weights.cfg baseline created
+
+Co-authored-by: CommandCodeBot <noreply@commandcode.ai>
