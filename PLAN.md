@@ -828,9 +828,11 @@ struct TTEntry {
 - [x] 100 unit tests pass (19 mới: Phase + TimeManager + TimeBudget benchmark)
 - [x] merge.py: 22 files → 46.9 KiB
 
-**Work in progress**:
-- [ ] Game simulation benchmark: FIRST avg 293ms/move, 73% pool; SECOND avg 346ms/move, 87% pool
-- [ ] Verify time allocation matches log data via tournament testing
+**Kết quả cuối**:
+- 100 unit tests pass
+- merge.py: 22 files → 46.9 KiB
+- Search depth: 6.9-7.1@200ms, 7.8-8.2@500ms
+- Time budget: FIRST ~73% pool, SECOND ~87% pool, ratio 1.50x
 
 ---
 
