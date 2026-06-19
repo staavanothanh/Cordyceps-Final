@@ -21,6 +21,7 @@ struct Move {
     std::int8_t c1;
     std::int8_t r2;
     std::int8_t c2;
+    int score_hint{0};  // temporary sort key (set by enhance_root_moves)
 
     [[nodiscard]] bool is_pass() const noexcept { return r1 == -1; }
 

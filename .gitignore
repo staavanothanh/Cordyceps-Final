@@ -49,4 +49,8 @@ setting*.ini
 protocol_debug.txt
 .git_commit_msg.txt
 
+# Optuna tuning database (supports resume)
+optuna_study.db
+best_weights.cfg
+
 .commandcode/

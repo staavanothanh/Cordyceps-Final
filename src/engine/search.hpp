@@ -92,21 +92,14 @@ private:
     // Negamax α-β
     int negamax(Board& board, int depth, int alpha, int beta, bool allow_pass) noexcept;
 
-    // Negamax α-β with geometry-enhanced leaf evaluation
-    int negamax_geo(Board& board, int depth, int alpha, int beta, bool allow_pass) noexcept;
-
-    // Endgame exact solver (no depth limit, for low live_count)
+    // Endgame exact solver (no depth limit, for live_count ≤ 12)
     int negamax_endgame(Board& board, int alpha, int beta, bool allow_pass) noexcept;
 
-    // Geometry-enhanced leaf evaluation (static + mobility + safety/vulnerability/steal)
-    [[nodiscard]] int evaluate_with_geometry(const Board& board, int player,
-                                              const std::vector<Move>& moves) noexcept;
+    // Root-level geometry enhancement: score each root move with eval+geometry
+    void enhance_root_moves(Board& board, std::vector<Move>& moves, int player) noexcept;
 
     // Move ordering: sort moves before search loop
     void sort_moves(Board& board, std::vector<Move>& moves, int depth, const Move& tt_move) noexcept;
-
-    // Eval weights
-    EvalWeights ew_{};
 };
 
 } // namespace cordyceps

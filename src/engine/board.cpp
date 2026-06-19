@@ -181,6 +181,34 @@ int Board::score_from_perspective(int player) const noexcept {
     return opp_score - my_score;
 }
 
+// ===== Runtime weight loading for tuning =====
+// Thread-local: zero overhead when not in tune mode
+// Order: score, territory, corners, edges, live_adj, recapture, vulnerability
+static thread_local int g_tune_w0 = 0;
+static thread_local int g_tune_w1 = 0;
+static thread_local int g_tune_w2 = 0;
+static thread_local int g_tune_w3 = 0;
+static thread_local int g_tune_w4 = 0;
+static thread_local int g_tune_w5 = 0;
+static thread_local int g_tune_w6 = 0;
+static thread_local bool g_tune_active = false;
+
+void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
+                      int adj_w, int recapture_w, int vulnerability_w) noexcept {
+    g_tune_w0 = score_w;
+    g_tune_w1 = territory_w;
+    g_tune_w2 = corner_w;
+    g_tune_w3 = edge_w;
+    g_tune_w4 = adj_w;
+    g_tune_w5 = recapture_w;
+    g_tune_w6 = vulnerability_w;
+    g_tune_active = true;
+}
+
+void clear_tune_weights() noexcept {
+    g_tune_active = false;
+}
+
 int evaluate(const Board& board, int player) noexcept {
     const auto& ec = board.eval_cache;
 
@@ -198,6 +226,23 @@ int evaluate(const Board& board, int player) noexcept {
         edge_diff = -edge_diff;
         adj_diff = -adj_diff;
         conn_diff = -conn_diff;
+    }
+
+    // Use runtime weights if active
+    if (g_tune_active) {
+        // recapture = opponent's live_adj cells (we can steal them)
+        int recapture = -territory_diff;  // cells we don't own but opponent has
+        // vulnerability = our cells that are adjacent to live mushrooms
+        int vulnerability = adj_diff;  // our cells exposed to recapture
+
+        return score * g_tune_w0
+             + territory_diff * g_tune_w1
+             + corner_diff * g_tune_w2
+             + edge_diff * g_tune_w3
+             + adj_diff * g_tune_w4
+             + recapture * g_tune_w5
+             + vulnerability * g_tune_w6
+             + conn_diff * 0;
     }
 
     // Temp weights: rebalanced from reference engines (superchym + mushroom-bot)

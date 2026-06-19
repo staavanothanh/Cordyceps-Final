@@ -33,6 +33,7 @@ set(UNIT_TESTS
     tests/unit/test_protocol_flow.cpp
     tests/unit/test_turn2_crash.cpp
     tests/unit/test_eval_upgrade.cpp
+    tests/unit/test_tuner_weights.cpp
 )
 
 # GoogleTest via FetchContent
@@ -79,3 +80,18 @@ target_link_libraries(cordyceps_tests GTest::gtest GTest::gmock GTest::gtest_mai
 enable_testing()
 include(GoogleTest)
 gtest_discover_tests(cordyceps_tests)
+
+# Tuner CLI (weight optimization tool)
+add_executable(tuner_cli
+    tools/tuner_cli.cpp
+    src/common/bitboard.cpp
+    src/common/prefix_sum.cpp
+    src/engine/board.cpp
+    src/engine/movegen.cpp
+    src/engine/rect_table.cpp
+    src/engine/search.cpp
+    src/engine/timeman.cpp
+    src/engine/zobrist.cpp
+    src/engine/tt.cpp
+)
+target_include_directories(tuner_cli PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -94,6 +94,11 @@ private:
 // Free function evaluate (side-agnostic)
 namespace cordyceps {
 [[nodiscard]] int evaluate(const Board& board, int player) noexcept;
+
+// Runtime weight loading for tuning (thread-local, zero-overhead when not set)
+void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
+                      int adj_w, int recapture_w, int vulnerability_w) noexcept;
+void clear_tune_weights() noexcept;
 }
 
 #endif // CORDYCEPS_ENGINE_BOARD_HPP

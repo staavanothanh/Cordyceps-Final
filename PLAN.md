@@ -854,7 +854,10 @@ struct TTEntry {
 | 5.8 | `src/engine/search.hpp` | EvalWeights struct | ✅ Hoàn thành |
 | 5.9 | `tests/unit/test_eval_upgrade.cpp` | 11 unit tests | ✅ Hoàn thành |
 | 5.10 | `scripts/tournament.py` | Tournament: cordyceps vs agent + superchym | ✅ Hoàn thành |
-| 5.11 | `scripts/merge.py` | Final submission single-file | ❌ Pending |
+| 5.11 | `scripts/merge.py` | Final submission single-file | ✅ Hoàn thành |
+| 5.12 | `src/engine/search.cpp` | Replace negamax_geo → enhance_root_moves (root-level geometry) | ✅ Hoàn thành |
+| 5.13 | `src/common/types.hpp` | score_hint field for root move sorting | ✅ Hoàn thành |
+| 5.14 | — | SECOND SideConfig tuning (time_mult=2.0, aggression=1.0) → **LÀM YẾU HƠN** (50%→32%) | ❌ Reverted |
 
 **Kết quả tournament CUỐI CÙNG (28 games, 2 opponents)**:
 ```
@@ -893,27 +896,116 @@ conn:        *0 (disabled — hurts without safety features)
 
 **Key learnings**:
 - Connectivity với +weight HURTS (ô kết nối dễ bị steal group).
-- Geometry features (mobility, safety, steal) code OK nhưng chậm: depth 7.4→6.2.
+- Geometry features (mobility, safety, steal) code OK nhưng chậm: depth 7.4→6.2. Replaced with root-level enhance.
 - Endgame solver exact cho live ≤ 12.
 - **Eval weight ratio là yếu tố #1**. Một dòng thay đổi: 7%→50%.
+- **SideConfig tuning HURTS** khi eval chưa đủ mạnh. Tăng time_mult/aggression cho SECOND làm FIRST yếu hơn (57%) và SECOND không cải thiện (14%). Reverted về config gốc.
+- **enhance_root_moves()**: root-level geometry enable. Giữ nguyên depth. Tác động win rate trung tính (±0%).
 
-**Đánh giá hiện tại**: Engine ỔN. Chơi được, thắng thua cân bằng với 2 đối thủ. Chưa phải top nhưng đã competitive.
+**Đánh giá hiện tại**: Engine ỔN. 50% vs agent + superchym. FIRST 86% (dominant), SECOND 14% (yếu).
 
-**Còn gì để cải thiện**:
-1. **SECOND win rate** (14%): cần aggressive hơn. Có thể tăng time_mult lên 2.0, tăng aggression, thêm steal bias trong order_score.
-2. **ENDGAME solver**: hiện trigger live ≤ 12 nhưng hiếm khi có tác dụng vì engine thường kết thúc sớm. Cần test kỹ hơn.
-3. **GEOMETRY features**: mobility/safety/steal code có sẵn nhưng chậm. Nếu optimize (reduce rect scan, cache results), depth sẽ tăng và cải thiện chất lượng game.
-4. **MOVE ORDERING**: chưa có TT move bonus trong sort_moves ngoài depth 0. Có thể cải thiện.
-5. **FUTILITY pruning**: code sẵn nhưng disabled. Cần tune threshold đúng.
-6. **merge.py**: cần merge multi-file src/ → single main.cpp cho submission.
-7. **data.bin size**: hiện ~350KB, còn thoải mái dưới 10MB. Có thể thêm precomputed geometry nếu cần.
-8. **SPSA tuning loop**: tự động tune weights bằng self-play. Hiện weights đang manually tuned.
+**Những gì còn lại để cải thiện**:
+1. **SECOND win rate (14%)**: Cần search sâu hơn không phải time nhiều hơn. 
+   → Đã thử: time_mult=1.5→2.0, aggression=0.7→1.0, steal=1.0→2.0
+   → Kết quả: FIRST yếu (57%), SECOND vẫn 14%, TOTAL 32%.
+   → Kết luận: chưa có cách fix dễ. Cần cải thiện eval/search trước.
+2. **GEOMETRY features**: mobility/safety/steal code có sẵn (enhance_root_moves).
+   → Maintained: root-level enhance (1ms/search). No depth penalty.
+   → Full search-time geometry (negamax_geo) đã xóa — depth 7.4→6.2 không đáng.
+3. **merge.py**: ✅ Works. 22 files → 54.1 KiB single main.cpp. WSL compile OK.
+4. **FUTILITY pruning**: code sẵn nhưng disabled. Cần eval ổn định trước.
+5. **MOVE ORDERING**: TT move bonus trong sort_moves. OK.
+6. **data.bin**: ~350KB, dưới 10MB. Có thể thêm precomputed.
+7. **SPSA tuning**: cuối cùng khi không còn gì để cải thiện nữa.
 
-**Kế hoạch ưu tiên tiếp theo**:
-1. 🔄 Cải thiện SECOND win rate (tune SideConfig, thêm aggressive strategy)
-2. ❌ Optimize evaluate_with_geometry for speed
-3. ❌ merge.py → single submission file
-4. ❌ SPSA tuning loop cho eval weights
+**Kết luận (thẳng thắn)**:
+- Engine đã đạt plateau ở 50%.
+- Cần refactor eval/search architecture để vượt qua.
+- SideConfig tuning và geometry features là "low-hanging fruit" đã hái hết.
+- Bước tiếp theo thực tế nhất: benchmark score_diff giữa các engine để tune eval weights bằng SPSA/self-play. Hoặc quay lại Phase 3 cải thiện search depth.
+
+---
+
+### ✅ Phase 5A Experiments (2026-06-19)
+
+**Các thử nghiệm đã thực hiện (TDD workflow, tournament verify):**
+
+| # | Thử nghiệm | Kết quả | Kết luận |
+|---|-----------|---------|----------|
+| 1 | **Steal × 1000 trong move ordering** (agent approach) | TOTAL 36%, FIRST 50%, SECOND 21% | ❌ Reverted. FIRST mất 86%→50%. Neutral-to-harmful. |
+| 2 | **Recapture + Vulnerability features** (O(170) scan trong evaluate) | TOTAL 40-50%, FIRST 64-86%, SECOND 14-21% | ✅ Kept. Agent 57% trong best run. Neutral-to-positive. |
+| 3 | **TT 2^20** (1M entries, 32 MiB) | TOTAL 46%, FIRST 71% | ❌ Reverted. Clear overhead +2ms/search làm giảm depth. |
+
+**Trạng thái cuối (kept changes):**
+- evaluate() có thêm recapture (opponent stealable cells *2) + vulnerability (our stealable cells *-2)
+- score_hint field trong Move struct (reuse từ enhance_root_moves)
+- Tất cả các thay đổi khác đã revert về baseline
+
+**QA Assessment — Engine hiện tại:**
+- **FIRST (86%)**: DOMINANT. Lợi thế snowball tận dụng triệt để.
+- **SECOND (14%)**: WEAK. Cần strategy overhaul, không phải tuning.
+- **Score_diff**: FIRST +36/game, SECOND -52/game.
+- **Depth**: 7.4 @ 500ms — bottleneck chính.
+- **Eval features**: 7 features (score, territory, corners, edges, live_adj, recapture, vulnerability).
+- **Sức mạnh so với đối thủ**: 50-50 với cả agent + superchym.
+
+**Bài học rút ra:**
+1. **Move ordering improvement không đủ** — steal × 1000 không giúp ích vì các moves được sắp xếp khác nhau mỗi node, không đồng nhất.
+2. **Eval features cải thiện nhẹ** — recapture/vulnerability giúp agent win rate tăng từ 50%→57% trong best run, nhưng không ổn định.
+3. **TT size không phải vấn đề** — vì clear mỗi search, TT lớn hơn chỉ gây overhead.
+4. **Depth 7.4 là bottleneck thực sự** — không có thay đổi nào tăng depth đáng kể.
+5. **SECOND yếu do search depth không đủ sâu** — không phải do time management hay eval.
+
+**Hướng đi tiếp theo (còn lại để cải thiện):**
+1. 🔄 **LMR aggressive** (mushroom-bot approach: R=2 base depth 5+) — duy nhất có thể tăng depth đáng kể
+2. 🔄 **Futility pruning depth ≤ 1** — skip branches không viable
+3. 🔄 **Move gen sau TT probe** — không gen moves nếu probe cho cutoff
+4. ❌ merge.py và submission package
+5. ❌ SPSA tuning loop
+
+---
+
+### ✅ Phase 5B — Eval Weight Tuning Infrastructure (2026-06-19)
+
+**Tuner tooling completed (TDD verified):**
+
+| Component | File | Status |
+|-----------|------|--------|
+| Runtime weight loading | `board.hpp/cpp` — thread_local `set_tune_weights()` | ✅ Tested |
+| C++ in-process tuner | `tools/tuner_cli.cpp` — plays games without subprocess | ✅ Build + test |
+| Optuna orchestrator | `tools/tune_optuna.py` — TPE sampler, 8 workers | ✅ Tested |
+| Resume mechanism | SQLite storage `optuna_study.db` | ✅ Verified: kill → restart → continue |
+| Tuner unit tests | `tests/unit/test_tuner_weights.cpp` — 4 tests | ✅ All pass |
+
+**Tuner architecture:**
+- `tuner_cli --weights w0 w1 w2 w3 w4 w5 w6 --games N --seed S --time MS`
+- In-process: calls iterative_deepening directly, no subprocess/protocol I/O
+- ~2s/game at 200ms/move budget
+- Output: `margin wins draws losses our_avg opp_avg score_diff elapsed_ms`
+
+**How to run tuning:**
+```bash
+# Delete old study for fresh run
+del optuna_study.db
+
+# Run full tune (200 trials × 20 games × 8 workers)
+python tools/tune_optuna.py --trials 200 --games 20 --workers 8 --time 200
+
+# Resume after interrupt (Ctrl+C, restart PC)
+python tools/tune_optuna.py --trials 200 --games 20 --workers 8 --time 200
+# → Automatically continues from last completed trial
+```
+
+**Weight ranges (from reference engine analysis):**
+| Weight | Current | Min | Max | Source |
+|--------|---------|-----|-----|--------|
+| score | 3 | 0 | 15 | Baseline |
+| territory | 3 | 0 | 15 | Scaled from old-cdc (170/25≈7) |
+| corners | 8 | 0 | 25 | Scaled from old-cdc (45/25≈2) + agent (25) |
+| edges | 2 | 0 | 10 | Scaled from agent (5) + old-cdc (25/25=1) |
+| live_adj | 3 | -5 | 10 | Proxy for recapture/vulnerability |
+| recapture | 0 | 0 | 15 | Agent ref (50) scaled |
+| vulnerability | 0 | -10 | 5 | Agent ref (15) scaled, typically negative |
 
 ---
 
