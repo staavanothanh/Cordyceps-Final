@@ -840,58 +840,80 @@ struct TTEntry {
 
 ### ⏳ Phase 5: Eval Upgrade + Tuning (In Progress)
 
-**Mục tiêu**: Improve eval features systematically, tune weights, tournament verification.
+**Mục tiêu**: Improve eval features, tune weights, tournament verification.
 
 | Task | Files | Mô tả | Trạng thái |
 |------|-------|-------|-----------|
-| 5.1 | `scripts/tournament.py` | Tournament runner: 14-game match, auto-swap, BTC-style logging, pluggable engines | ✅ Hoàn thành |
+| 5.1 | `scripts/tournament.py` | Tournament runner: 14-game, auto-swap, BTC-logging, pluggable engines | ✅ Hoàn thành |
 | 5.2 | `src/` (all) | Protocol bug fixes: OPP format, INIT parse, side detection | ✅ Hoàn thành |
 | 5.3 | `src/engine/board.cpp` | Fix UndoMove.changed_indices overflow (int8_t → uint8_t) | ✅ Hoàn thành |
-| 5.4 | `src/engine/board.cpp` | Fix connectivity incremental update in apply_move (EvalCache field từng là dead code) | ✅ Hoàn thành |
-| 5.5 | `src/engine/search.cpp` | Add evaluate_with_geometry() — mobility, safety, steal features | ✅ Hoàn thành |
-| 5.6 | `src/engine/search.cpp` | Add negamax_endgame() — exact solver cho live_count ≤ 8 | ✅ Hoàn thành |
-| 5.7 | `src/engine/search.cpp` | Add is_futile() — basic futility pruning | ✅ Implemented (disabled) |
-| 5.8 | `src/engine/search.hpp` | Add EvalWeights struct for configurable geometry weights | ✅ Hoàn thành |
-| 5.9 | `tests/unit/test_eval_upgrade.cpp` | 11 new unit tests: connectivity, mobility, endgame, futility | ✅ Hoàn thành |
-| 5.10 | `scripts/` | Tournament: cordyceps vs reference bots | 🔄 In progress |
-| 5.11 | `scripts/merge.py` | Final submission package | ❌ Pending |
+| 5.4 | `src/engine/board.cpp` | Fix connectivity incremental update (EvalCache field từng dead) | ✅ Hoàn thành |
+| 5.5 | `src/engine/search.cpp` | evaluate_with_geometry() — mobility, safety, steal features | ✅ Hoàn thành |
+| 5.6 | `src/engine/search.cpp` | negamax_endgame() — exact solver cho live_count ≤ 12 | ✅ Hoàn thành |
+| 5.7 | `src/engine/search.cpp` | is_futile() pruning stub | ✅ Code OK (disabled) |
+| 5.8 | `src/engine/search.hpp` | EvalWeights struct | ✅ Hoàn thành |
+| 5.9 | `tests/unit/test_eval_upgrade.cpp` | 11 unit tests | ✅ Hoàn thành |
+| 5.10 | `scripts/tournament.py` | Tournament: cordyceps vs agent + superchym | ✅ Hoàn thành |
+| 5.11 | `scripts/merge.py` | Final submission single-file | ❌ Pending |
 
-**Gate kiểm tra hiện tại**:
-- [x] Protocol OPP format: `OPP <r1> <c1> <r2> <c2> <t>` (không side name)
-- [x] Fix UndoMove.changed_indices int8_t overflow
-- [x] Fix connectivity incremental update (6 unit tests confirm)
-- [x] Endgame exact solver: hoạt động cho live_count ≤ 8
-- [x] Tournament script: 14-game swap, BTC logs, pluggable engines
-- [x] 112/112 non-benchmark tests pass
-- [x] WSL g++-14 compile + run OK
-- [ ] Geometry features (mobility, safety, steal) cần tuned weights — hiện đang bị disable
-- [ ] Win rate ≥ old cordyceps baseline: **7%** (1/14) — cần tuning
+**Kết quả tournament CUỐI CÙNG (28 games, 2 opponents)**:
+```
+vs agent:     50% (7W 6L 1D)
+vs superchym: 50% (7W 6L 1D)  ← submission_check.exe!
+TOTAL:        50% (14W 12L 2D)
+As FIRST:    86% (12/14)  score_diff=+43  DOMINANT
+As SECOND:   14% (2/14)   score_diff=-40  YẾU HƠN
+```
 
-**Kết quả tournament SAU weight fix (score*3, territory*3, corners*8, edges*2, adj*3)**:
-- 14 games vs agent-i-think-change (3 runs avg): W:10.5 L:10.5 D:1.5 **(50% win rate, up from 7%)**
-- FIRST: 7.5/10.5 (71%), score_diff=+17/game average
-- SECOND: 1.5/10.5 (14%), score_diff=-29/game average
+**So sánh trước/sau fix weight**:
+| Đối thủ | Trước (7%) | Sau (50%) |
+|---------|-----------|-----------|
+| agent-i-think-change | **7%** (1/14) | **50%** (7/14) |
+| superchym | — | **50%** (7/14) |
 
-**Root cause of previous losses**:
-- **score*10 chiếm 70% eval, territory chỉ 8%** trong khi reference engines làm ngược lại
-- Engine chạy theo điểm số nấm đơn lẻ, bỏ qua lãnh thổ → đối thủ lấy lãnh thổ và snowball
-- Fix: reduce score từ 10→3, tăng territory từ 2→3, các feature khác tăng tương ứng
-- Kết quả: score 30%, territory 25%, eval cân bằng hơn
+**Weight hiện tại** (board.cpp evaluate):
+```cpp
+score:       *3 (was *10) — 30% eval (was 70%)
+territory:   *3 (was *2)  — 25% eval (was 8%)
+corners:     *8 (was *5)
+edges:       *2 (was *1)
+live_adj:    *3 (was *1)  — proxy recapture/vulnerability
+conn:        *0 (disabled — hurts without safety features)
+```
+
+**Root cause cốt lõi**: score*10 nuốt chửng eval (70%), territory chỉ 8%.
+→ engine chạy theo điểm nấm, không quan tâm lãnh thổ.
+→ Đối thủ lấy lãnh thổ, snowball, thắng.
+
+**FIRST/SECOND behavior**:
+- SideConfig áp dụng đúng: FIRST time_mult=1.0, SECOND=1.5
+- FIRST 86% win → cho thấy engine tận dụng lợi thế đi trước tốt
+- SECOND 14% → cần cải thiện (aggressive hơn, search sâu hơn)
+- Pattern matches BTC log data: strong engines 100% FIRST, ~60% SECOND
 
 **Key learnings**:
-- **Connectivity** với +weight HURTS: ô kết nối dễ bị steal group. Cần safety features đi kèm.
-- **Geometry features** (mobility, safety, steal) code OK nhưng chậm (giảm depth từ 7.4→6.2). Cần optimize.
-- **Endgame solver** exact cho live ≤ 12.
-- **Eval weight ratio** là yếu tố QUAN TRỌNG NHẤT. Một dòng thay đổi weight đã tăng win rate từ 7% lên 50%.
+- Connectivity với +weight HURTS (ô kết nối dễ bị steal group).
+- Geometry features (mobility, safety, steal) code OK nhưng chậm: depth 7.4→6.2.
+- Endgame solver exact cho live ≤ 12.
+- **Eval weight ratio là yếu tố #1**. Một dòng thay đổi: 7%→50%.
 
-**Kế hoạch Phase 5A hoàn thiện**:
-1. ✅ Fix connectivity incremental update (EvalCache không còn dead field)
-2. ✅ Code geometry features (evaluate_with_geometry)
-3. ✅ **[NEW]** Fix eval weight ratio (score*10→*3, territory*2→*3) — **biggest impact**
-4. ❌ Tune geometry feature weights (fast vs depth tradeoff)
-5. ❌ Optimize evaluate_with_geometry for speed
-6. ❌ Enable futility pruning (ưu tiên #3)
-7. ❌ Improve SECOND win rate (currently 14%)
+**Đánh giá hiện tại**: Engine ỔN. Chơi được, thắng thua cân bằng với 2 đối thủ. Chưa phải top nhưng đã competitive.
+
+**Còn gì để cải thiện**:
+1. **SECOND win rate** (14%): cần aggressive hơn. Có thể tăng time_mult lên 2.0, tăng aggression, thêm steal bias trong order_score.
+2. **ENDGAME solver**: hiện trigger live ≤ 12 nhưng hiếm khi có tác dụng vì engine thường kết thúc sớm. Cần test kỹ hơn.
+3. **GEOMETRY features**: mobility/safety/steal code có sẵn nhưng chậm. Nếu optimize (reduce rect scan, cache results), depth sẽ tăng và cải thiện chất lượng game.
+4. **MOVE ORDERING**: chưa có TT move bonus trong sort_moves ngoài depth 0. Có thể cải thiện.
+5. **FUTILITY pruning**: code sẵn nhưng disabled. Cần tune threshold đúng.
+6. **merge.py**: cần merge multi-file src/ → single main.cpp cho submission.
+7. **data.bin size**: hiện ~350KB, còn thoải mái dưới 10MB. Có thể thêm precomputed geometry nếu cần.
+8. **SPSA tuning loop**: tự động tune weights bằng self-play. Hiện weights đang manually tuned.
+
+**Kế hoạch ưu tiên tiếp theo**:
+1. 🔄 Cải thiện SECOND win rate (tune SideConfig, thêm aggressive strategy)
+2. ❌ Optimize evaluate_with_geometry for speed
+3. ❌ merge.py → single submission file
+4. ❌ SPSA tuning loop cho eval weights
 
 ---
 
