@@ -83,16 +83,19 @@ void Protocol::handle_opp(const std::string& line) {
                   static_cast<std::int8_t>(r2), static_cast<std::int8_t>(c2)};
 
     if (opp_move.is_pass()) {
+        // BTC may send duplicate OPP pass lines (logging bug).
+        // Skip the duplicate to avoid corrupting board state (consecutive_passes,
+        // current_player). Only apply the first real pass.
         if (pass_tracker_.last_pass_player != k_player_opp) {
             pass_tracker_.opp_has_passed = true;
             pass_tracker_.last_pass_player = k_player_opp;
+            static_cast<void>(board_.apply_move(opp_move));
         }
     } else {
         pass_tracker_.last_pass_player = 0;
         pass_tracker_.opp_has_passed = false;
+        static_cast<void>(board_.apply_move(opp_move));
     }
-
-    static_cast<void>(board_.apply_move(opp_move));
 }
 
 void Protocol::handle_time(const std::string& line) {

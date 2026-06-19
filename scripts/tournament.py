@@ -191,9 +191,9 @@ class MatchRunner:
         players = [self.p1, self.p2]
         consecutive_pass_count = 0
 
-        # READY phase
-        players[0].send(f"READY {names[0]}")
-        players[1].send(f"READY {names[1]}")
+        # READY phase — BTC format: "READY FIRST" / "READY SECOND"
+        players[0].send("READY FIRST")
+        players[1].send("READY SECOND")
         r0 = self.p1.readline(5.0)
         r1 = self.p2.readline(5.0)
         if r0 != "OK" or r1 != "OK":

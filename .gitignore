@@ -39,8 +39,11 @@ training_data.csv
 
 # Misc
 logs/
+logs_btc/
+logs_P2/
 tournament_logs/
 *.tmp
+*.db
 temp*.txt
 input*.txt
 test_*.txt
