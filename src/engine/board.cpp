@@ -59,7 +59,7 @@ UndoMove Board::apply_move(const Move& mv) noexcept {
             const int idx = r * k_cols + c;
             if (idx < 0 || idx >= k_cells) continue; // safety
             if (values[idx] > 0) {
-                undo.changed_indices[change_idx] = static_cast<std::int8_t>(idx);
+                undo.changed_indices[change_idx] = static_cast<std::uint8_t>(idx);
                 undo.old_values[change_idx] = values[idx];
                 sum_collected += values[idx];
 

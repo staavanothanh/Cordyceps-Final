@@ -26,7 +26,7 @@ static_assert(sizeof(EvalCache) == 40, "EvalCache must be 40 bytes");
 struct UndoMove {
     Move mv;
     int  changed_count{0};
-    std::array<std::int8_t, k_cells> changed_indices;
+    std::array<std::uint8_t, k_cells> changed_indices;
     std::array<std::int8_t, k_cells> old_values;
     Bitboard old_my_mask;
     Bitboard old_opp_mask;
