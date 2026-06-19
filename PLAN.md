@@ -1148,4 +1148,44 @@ constexpr int W_RECAPTURE    = 39;   // Ô đối thủ có thể steal
 
 ---
 
+### ✅ Phase 5D — Side-Specific Eval Weights + 14-param Tuner (2026-06-19)
+
+**Mục tiêu**: Nạp bộ eval weights riêng cho FIRST và SECOND. Nâng cấp tuner thành 14-param (7 FIRST + 7 SECOND).
+
+**Thay đổi chính:**
+
+| Component | File | Thay đổi |
+|-----------|------|----------|
+| EvalWeights struct | `src/engine/board.hpp` | 7 fields: score, territory, corners, edges, live_adj, recapture, vulnerability |
+| evaluate() overload | `src/engine/board.cpp` | Accept optional `const EvalWeights*` (nullptr = baseline) |
+| GeoWeights rename | `src/engine/search.hpp` | Renamed from EvalWeights to avoid conflict with board.hpp |
+| Dual-weight tuner | `tools/tuner_cli.cpp` | Accept `--weights-first` + `--weights-second` (14 params) |
+| Dual-side Optuna | `tools/tune_optuna.py` | Sample 14 params per trial, track both sides |
+| TDD tests | `tests/unit/test_side_weights.cpp` | 5 tests: struct, baseline, nullptr, custom, perspective flip |
+
+**Kết quả verify:**
+- **122/123 tests pass** (1 pre-existing flaky TT benchmark)
+- Tuner single-weight mode: margin=0.0 (baseline self-play balanced)
+- Tuner dual-weight mode: margin=-7.0 (score*7 SECOND hurts)
+- WSL compile: 0 errors, 0 warnings
+- submission/main.cpp: 56.3 KiB (under 1 MiB)
+
+**Cách chạy tune (PowerShell):**
+```powershell
+# Fresh tune (14-param dual-side):
+python tools/tune_optuna.py --trials 200 --games 8 --workers 8 --time 500
+
+# Resume after Ctrl+C or restart:
+python tools/tune_optuna.py --trials 200 --games 8 --workers 8 --time 500
+```
+
+**Ranges cho 14 params (từ phân tích 4 reference engines):**
+```
+FIRST:  score(0-15) territory(0-15) corners(0-25) edges(0-10)
+        live_adj(-5-10) recapture(0-15) vulnerability(-10-5)
+SECOND: same ranges
+```
+
+---
+
 > **Tài liệu này là kế hoạch sống — cập nhật sau mỗi phase khi có dữ liệu thực tế từ testing.**

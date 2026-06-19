@@ -141,6 +141,20 @@ bool Bitboard::is_empty() const noexcept {
 
 namespace cordyceps {
 
+struct EvalWeights {
+    int score{3};
+    int territory{3};
+    int corners{8};
+    int edges{2};
+    int live_adj{3};
+    int recapture{0};
+    int vulnerability{0};
+
+    [[nodiscard]] static constexpr EvalWeights baseline() noexcept {
+        return EvalWeights{3, 3, 8, 2, 3, 0, 0};
+    }
+};
+
 struct EvalCache {
     int my_territory{0};
     int opp_territory{0};
@@ -227,6 +241,7 @@ private:
 // Free function evaluate (side-agnostic)
 namespace cordyceps {
 [[nodiscard]] int evaluate(const Board& board, int player) noexcept;
+[[nodiscard]] int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept;
 
 // Runtime weight loading for tuning (thread-local, zero-overhead when not set)
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
@@ -444,7 +459,7 @@ void clear_tune_weights() noexcept {
     g_tune_active = false;
 }
 
-int evaluate(const Board& board, int player) noexcept {
+int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept {
     const auto& ec = board.eval_cache;
 
     int score = board.score_from_perspective(player);
@@ -463,7 +478,16 @@ int evaluate(const Board& board, int player) noexcept {
         conn_diff = -conn_diff;
     }
 
-    // Use runtime weights if active
+    if (weights) {
+        return score * weights->score
+             + territory_diff * weights->territory
+             + corner_diff * weights->corners
+             + edge_diff * weights->edges
+             + adj_diff * weights->live_adj
+             + conn_diff * 0;
+    }
+
+    // Use runtime weights if active (tuner mode)
     if (g_tune_active) {
         return score * g_tune_w0
              + territory_diff * g_tune_w1
@@ -473,14 +497,20 @@ int evaluate(const Board& board, int player) noexcept {
              + conn_diff * 0;
     }
 
-    // Baseline weights (proven: 38% vs agent+superchym, FIRST 63%)
-    // Score *3, Territory *3, Corners *8, Edges *2, LiveAdj *3
-    return score * 3
-         + territory_diff * 3
-         + corner_diff * 8
-         + edge_diff * 2
-         + adj_diff * 3
-         + conn_diff * 0;
+    {
+        constexpr auto b = EvalWeights::baseline();
+        return score * b.score
+             + territory_diff * b.territory
+             + corner_diff * b.corners
+             + edge_diff * b.edges
+             + adj_diff * b.live_adj
+             + conn_diff * 0;
+    }
+}
+
+int evaluate(const Board& board, int player) noexcept {
+    // Delegate to the overload with nullptr (uses tune weights or baseline)
+    return evaluate(board, player, static_cast<const EvalWeights*>(nullptr));
 }
 
 } // namespace cordyceps
@@ -1002,18 +1032,13 @@ void TranspositionTable::clear() noexcept {
 
 namespace cordyceps {
 
-struct EvalWeights {
-    // Static eval weights (applied to evaluate())
-    // -- not configurable, uses the hardcoded multipliers in evaluate()
-
-    // Geometry eval weights (enabled with conservative values)
-    int mobility = 1;       // per legal move difference (capped)
-    int safe_cell = 1;      // per safe cell (our territory not in threat)
-    int steal = 2;          // per steal opportunity (rects with only opponent cells)
+struct GeoWeights {
+    int mobility = 1;
+    int safe_cell = 1;
+    int steal = 2;
 };
 
-// Default weights tuned for balanced play
-constexpr EvalWeights k_default_weights{};
+constexpr GeoWeights k_default_geo_weights{};
 
 struct SearchResult {
     Move move;

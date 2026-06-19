@@ -209,7 +209,7 @@ void clear_tune_weights() noexcept {
     g_tune_active = false;
 }
 
-int evaluate(const Board& board, int player) noexcept {
+int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept {
     const auto& ec = board.eval_cache;
 
     int score = board.score_from_perspective(player);
@@ -228,7 +228,16 @@ int evaluate(const Board& board, int player) noexcept {
         conn_diff = -conn_diff;
     }
 
-    // Use runtime weights if active
+    if (weights) {
+        return score * weights->score
+             + territory_diff * weights->territory
+             + corner_diff * weights->corners
+             + edge_diff * weights->edges
+             + adj_diff * weights->live_adj
+             + conn_diff * 0;
+    }
+
+    // Use runtime weights if active (tuner mode)
     if (g_tune_active) {
         return score * g_tune_w0
              + territory_diff * g_tune_w1
@@ -238,14 +247,20 @@ int evaluate(const Board& board, int player) noexcept {
              + conn_diff * 0;
     }
 
-    // Baseline weights (proven: 38% vs agent+superchym, FIRST 63%)
-    // Score *3, Territory *3, Corners *8, Edges *2, LiveAdj *3
-    return score * 3
-         + territory_diff * 3
-         + corner_diff * 8
-         + edge_diff * 2
-         + adj_diff * 3
-         + conn_diff * 0;
+    {
+        constexpr auto b = EvalWeights::baseline();
+        return score * b.score
+             + territory_diff * b.territory
+             + corner_diff * b.corners
+             + edge_diff * b.edges
+             + adj_diff * b.live_adj
+             + conn_diff * 0;
+    }
+}
+
+int evaluate(const Board& board, int player) noexcept {
+    // Delegate to the overload with nullptr (uses tune weights or baseline)
+    return evaluate(board, player, static_cast<const EvalWeights*>(nullptr));
 }
 
 } // namespace cordyceps

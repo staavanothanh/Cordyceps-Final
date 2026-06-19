@@ -12,18 +12,13 @@
 
 namespace cordyceps {
 
-struct EvalWeights {
-    // Static eval weights (applied to evaluate())
-    // -- not configurable, uses the hardcoded multipliers in evaluate()
-
-    // Geometry eval weights (enabled with conservative values)
-    int mobility = 1;       // per legal move difference (capped)
-    int safe_cell = 1;      // per safe cell (our territory not in threat)
-    int steal = 2;          // per steal opportunity (rects with only opponent cells)
+struct GeoWeights {
+    int mobility = 1;
+    int safe_cell = 1;
+    int steal = 2;
 };
 
-// Default weights tuned for balanced play
-constexpr EvalWeights k_default_weights{};
+constexpr GeoWeights k_default_geo_weights{};
 
 struct SearchResult {
     Move move;

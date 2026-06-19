@@ -8,6 +8,20 @@
 
 namespace cordyceps {
 
+struct EvalWeights {
+    int score{3};
+    int territory{3};
+    int corners{8};
+    int edges{2};
+    int live_adj{3};
+    int recapture{0};
+    int vulnerability{0};
+
+    [[nodiscard]] static constexpr EvalWeights baseline() noexcept {
+        return EvalWeights{3, 3, 8, 2, 3, 0, 0};
+    }
+};
+
 struct EvalCache {
     int my_territory{0};
     int opp_territory{0};
@@ -94,6 +108,7 @@ private:
 // Free function evaluate (side-agnostic)
 namespace cordyceps {
 [[nodiscard]] int evaluate(const Board& board, int player) noexcept;
+[[nodiscard]] int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept;
 
 // Runtime weight loading for tuning (thread-local, zero-overhead when not set)
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,

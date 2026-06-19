@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """
-Optuna eval weight tuner for Cordyceps engine.
-Usage: python tools/tune_optuna.py --trials 200 --games 20 --workers 8
+Optuna eval weight tuner for Cordyceps engine — DUAL-SIDE mode.
+Tunes 14 params: 7 for FIRST + 7 for SECOND, simultaneously via self-play.
+
+Usage:
+  python tools/tune_optuna.py --trials 200 --games 8 --workers 8 --time 500
+
+Resume (Ctrl+C → re-run same command):
+  python tools/tune_optuna.py --trials 200 --games 8 --workers 8 --time 500
 
 Features:
 - In-process C++ tuner (no subprocess/IO overhead)
-- Resume via SQLite storage (Ctrl+C → restart → continue)
+- 14-param dual-side tuning (7 FIRST + 7 SECOND)
+- Resume via SQLite storage
 - Multi-worker parallel evaluation
-- Automatic best-weight persistence
+- Automatic best-weight persistence to best_weights.cfg
 """
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 import time
@@ -20,72 +26,68 @@ from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parent.parent
 TUNER_EXE = PROJECT / "build" / "tuner_cli.exe"
-BASELINE_W = [3, 3, 8, 2, 3, 0, 0]  # current default weights
 
-# Order: score, territory, corners, edges, live_adj, recapture, vulnerability
-WEIGHT_SPEC = [
-    ("score",         0, 15, 3),      # ±15 range, default 3
-    ("territory",     0, 15, 3),      # ±15, default 3
-    ("corners",       0, 25, 8),      # ±25, default 8
-    ("edges",         0, 10, 2),      # ±10, default 2
-    ("live_adj",     -5, 10, 3),      # can be negative
-    ("recapture",     0, 15, 2),      # opponent's stealable cells
-    ("vulnerability",-10,  5, 0),      # our stealable cells (negative = penalty)
-]
+# Order: same as EvalWeights struct in board.hpp
+WEIGHT_NAMES = ["score", "territory", "corners", "edges", "live_adj", "recapture", "vulnerability"]
+
+# Per-weight ranges (min, max, default_from_baseline)
+# Reference-scaled from mushroom-bot, superchym, agent-i-think-change
+WEIGHT_RANGES = {
+    "score":         (0,  15, 3),
+    "territory":     (0,  15, 3),
+    "corners":       (0,  25, 8),
+    "edges":         (0,  10, 2),
+    "live_adj":      (-5, 10, 3),
+    "recapture":     (0,  15, 0),
+    "vulnerability": (-10, 5, 0),
+}
+
+BASELINE = [3, 3, 8, 2, 3, 0, 0]
 
 
 def ensure_tuner():
-    """Build tuner_cli if not present."""
     if not TUNER_EXE.exists():
         print("Building tuner_cli...")
-        import subprocess
         r = subprocess.run(
             ["cmake", "--build", str(PROJECT / "build"), "--target", "tuner_cli"],
-            capture_output=True, text=True
-        )
+            capture_output=True, text=True)
         if r.returncode != 0:
             print(f"Build failed: {r.stderr}", file=sys.stderr)
             sys.exit(1)
 
 
-def run_tuner(weights, games, seed, time_ms, timeout_s=300):
-    """Run tuner_cli with given weights. Returns (margin, wins, draws, losses, our_avg, opp_avg, score_diff, elapsed_ms)."""
-    w = [str(x) for x in weights]
-    cmd = [str(TUNER_EXE), "--weights"] + w + ["--games", str(games), "--seed", str(seed), "--time", str(time_ms)]
+def run_tuner(weights_first, weights_second, games, seed, time_ms, timeout_s=600):
+    """Run tuner_cli with dual weights. Returns (margin, wins, draws, losses, our_avg, opp_avg, score_diff, elapsed_ms)."""
+    cmd = ([str(TUNER_EXE),
+            "--weights-first"] + [str(x) for x in weights_first] +
+           ["--weights-second"] + [str(x) for x in weights_second] +
+           ["--games", str(games), "--seed", str(seed), "--time", str(time_ms)])
     try:
         r = subprocess.run(cmd, cwd=str(PROJECT), capture_output=True, text=True, timeout=timeout_s)
         if r.returncode != 0:
-            print(f"  [!] tuner_cli error: {r.stderr.strip()}", file=sys.stderr)
             return (-999.0, 0, 0, 0, 0.0, 0.0, 0, 0)
         parts = r.stdout.strip().split()
         return (
-            float(parts[0]),  # margin
-            int(parts[1]),   # wins
-            int(parts[2]),   # draws
-            int(parts[3]),   # losses
-            float(parts[4]), # our_avg
-            float(parts[5]), # opp_avg
-            int(parts[6]),   # score_diff
-            int(parts[7]),   # elapsed_ms all games
+            float(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]),
+            float(parts[4]), float(parts[5]), int(parts[6]), int(parts[7]),
         )
     except subprocess.TimeoutExpired:
-        print(f"  [!] tuner_cli timed out", file=sys.stderr)
         return (-999.0, 0, 0, 0, 0.0, 0.0, 0, 0)
-    except Exception as e:
-        print(f"  [!] Error: {e}", file=sys.stderr)
+    except Exception:
         return (-999.0, 0, 0, 0, 0.0, 0.0, 0, 0)
 
 
 def objective(trial, games, time_ms, base_seed, verbose=False):
-    """Optuna objective: run tuner_cli with sampled weights."""
-    w = []
-    for name, lo, hi, default in WEIGHT_SPEC:
-        val = trial.suggest_int(name, lo, hi)
-        w.append(val)
+    """Sample 14 weights, run tuner. Returns margin."""
+    fw = []
+    sw = []
+    for name in WEIGHT_NAMES:
+        lo, hi, default = WEIGHT_RANGES[name]
+        fw.append(trial.suggest_int(f"f_{name}", lo, hi))
+        sw.append(trial.suggest_int(f"s_{name}", lo, hi))
 
     seed = base_seed + trial.number
-    result = run_tuner(w, games, seed, time_ms)
-
+    result = run_tuner(fw, sw, games, seed, time_ms)
     margin, wins, draws, losses, our_avg, opp_avg, score_diff, elapsed = result
 
     trial.set_user_attr("wins", wins)
@@ -95,49 +97,53 @@ def objective(trial, games, time_ms, base_seed, verbose=False):
     trial.set_user_attr("opp_avg", round(opp_avg, 1))
     trial.set_user_attr("score_diff", score_diff)
     trial.set_user_attr("elapsed_ms", elapsed)
+    trial.set_user_attr("fw", fw)
+    trial.set_user_attr("sw", sw)
 
     if verbose or trial.number % 10 == 0:
-        games_total = wins + draws + losses
-        s = f"  #{trial.number:4d}: margin={margin:+.2f} W{wins}D{draws}L{losses} ({our_avg:.1f}v{opp_avg:.1f}) [{elapsed//1000}s] {w}"
+        total = wins + draws + losses
+        s = (f"  #{trial.number:4d}: margin={margin:+.2f} "
+             f"W{wins}D{draws}L{losses} ({our_avg:.1f}v{opp_avg:.1f}) "
+             f"[{elapsed//1000}s]"
+             f"  FW={fw[:3]}..  SW={sw[:3]}..")
         print(s, flush=True)
 
     return margin
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Optuna eval weight tuner for Cordyceps")
-    parser.add_argument("--trials", type=int, default=200, help="Number of Optuna trials")
-    parser.add_argument("--games", type=int, default=20, help="Games per trial")
-    parser.add_argument("--workers", type=int, default=8, help="Parallel workers (0 = serial)")
-    parser.add_argument("--time", type=int, default=500, help="Time budget per move (ms)")
+    parser = argparse.ArgumentParser(description="Optuna eval weight tuner for Cordyceps (dual-side)")
+    parser.add_argument("--trials", type=int, default=200, help="Optuna trials")
+    parser.add_argument("--games", type=int, default=8, help="Games per trial (4=fast, 8=standard, 16=precise)")
+    parser.add_argument("--workers", type=int, default=8, help="Parallel workers")
+    parser.add_argument("--time", type=int, default=500, help="ms/move")
     parser.add_argument("--seed", type=int, default=42, help="Base seed")
-    parser.add_argument("--study-name", default="cordyceps-weights-v1", help="Optuna study name")
+    parser.add_argument("--study-name", default="cordyceps-weights-v2", help="Optuna study name")
     parser.add_argument("--storage", default=f"sqlite:///{PROJECT / 'optuna_study.db'}", help="Optuna storage URL")
-    parser.add_argument("--verbose", action="store_true", help="Print every trial")
+    parser.add_argument("--verbose", action="store_true", help="Every trial")
     args = parser.parse_args()
 
-    # Build tuner
     ensure_tuner()
 
     # Baseline measurement
     print("=" * 60)
-    print("OPTUNA TUNE — Cordyceps Eval Weights")
+    print("OPTUNA TUNE v2 — Cordyceps Dual-Side Eval Weights")
     print(f"  {args.trials} trials × {args.games} games  |  {args.workers} workers  |  {args.time}ms/move")
+    print("  14 params: 7 FIRST + 7 SECOND")
     print("=" * 60)
 
     print("\n[1/3] Baseline (default weights)...")
-    bl = run_tuner(BASELINE_W, args.games * 2, args.seed, args.time)  # double games for baseline
+    bl = run_tuner(BASELINE, BASELINE, args.games * 2, args.seed, args.time)
     baseline_margin = bl[0]
-    print(f"  margin={baseline_margin:.2f} W{bl[1]}D{bl[2]}L{bl[3]} ({bl[4]:.1f}v{bl[5]:.1f}) [{bl[7]//1000}s]")
+    print(f"  margin={baseline_margin:.2f}  W{bl[1]}D{bl[2]}L{bl[3]}  ({bl[4]:.1f}v{bl[5]:.1f})  [{bl[7]//1000}s]")
 
-    # Estimate time properly using per-game time from baseline
-    per_game_ms = bl[7] / (args.games * 2) if (args.games * 2) > 0 else 1000
+    per_game_ms = bl[7] / max(args.games * 2, 1)
     per_trial_ms = per_game_ms * args.games
     est_s = per_trial_ms * args.trials / max(args.workers, 1) / 1000
-    print(f"\n  Est. time: ~{est_s/60:.0f} min ({est_s/3600:.1f}h) with {args.workers} workers")
+    print(f"\n  Est. time: ~{est_s/60:.0f} min ({est_s/3600:.2f}h)")
 
     # Optuna
-    print(f"\n[2/3] Optuna ({args.trials} trials)...")
+    print(f"\n[2/3] Optuna ({args.trials} trials, 14 params)...")
     import optuna
     from optuna.samplers import TPESampler
 
@@ -145,45 +151,50 @@ def main():
         direction="maximize",
         study_name=args.study_name,
         storage=args.storage,
-        load_if_exists=True,  # RESUME SUPPORT
-        sampler=TPESampler(seed=args.seed),
+        load_if_exists=True,
+        sampler=TPESampler(seed=args.seed, multivariate=True),
     )
 
-    if args.workers > 1:
-        study.optimize(
-            lambda trial: objective(trial, args.games, args.time, args.seed, args.verbose),
-            n_trials=args.trials,
-            n_jobs=args.workers,
-            show_progress_bar=True,
-        )
-    else:
-        study.optimize(
-            lambda trial: objective(trial, args.games, args.time, args.seed, args.verbose),
-            n_trials=args.trials,
-            show_progress_bar=True,
-        )
+    study.optimize(
+        lambda t: objective(t, args.games, args.time, args.seed, args.verbose),
+        n_trials=args.trials,
+        n_jobs=args.workers,
+        show_progress_bar=True,
+    )
 
+    # Results
     print("\n" + "=" * 60)
-    print(f"Best: trial #{study.best_trial.number}  margin={study.best_value:.2f}")
-    print(f"Baseline: {baseline_margin:.2f}  Delta: {study.best_value - baseline_margin:.2f}")
-    print(f"Weights: {study.best_params}")
+    bt = study.best_trial
+    print(f"Best: trial #{bt.number}  margin={bt.value:.2f}  (baseline={baseline_margin:.2f})")
+    print(f"  Delta: {bt.value - baseline_margin:+.2f}")
 
-    # Write best weights to file
+    fw = [int(bt.params.get(f"f_{n}", WEIGHT_RANGES[n][2])) for n in WEIGHT_NAMES]
+    sw = [int(bt.params.get(f"s_{n}", WEIGHT_RANGES[n][2])) for n in WEIGHT_NAMES]
+    print(f"  FIRST  weights: {fw}")
+    print(f"  SECOND weights: {sw}")
+
+    verify = run_tuner(fw, sw, 8, 42, args.time)
+    print(f"  Verify margin: {verify[0]:+.2f}  W{verify[1]}D{verify[2]}L{verify[3]}")
+
+    # Write best_weights.cfg
     best_path = PROJECT / "best_weights.cfg"
-    order = ["score", "territory", "corners", "edges", "live_adj", "recapture", "vulnerability"]
     with open(best_path, "w") as f:
-        f.write("# Cordyceps best eval weights (from Optuna tuning)\n")
-        f.write(f"# margin={study.best_value:.2f} (baseline={baseline_margin:.2f})\n")
-        for name in order:
-            f.write(f"{name}={study.best_params.get(name, 0)}\n")
-        f.write("\n")
-        # Also write a one-line weights for tuner_cli
-        vals = [str(study.best_params.get(name, 0)) for name in order]
-        f.write(" ".join(vals) + "\n")
+        f.write("# Cordyceps best eval weights (from Optuna v2 dual-side tuning)\n")
+        f.write(f"# margin={bt.value:.2f} (baseline={baseline_margin:.2f}) verify={verify[0]:.2f}\n")
+        f.write("#\n# To use: set env var WEIGHTS_CFG=best_weights.cfg or copy weights into code\n\n")
+        f.write("# FIRST weights (when engine plays as FIRST)\n")
+        f.write(f"FIRST={' '.join(str(x) for x in fw)}\n\n")
+        f.write("# SECOND weights (when engine plays as SECOND)\n")
+        f.write(f"SECOND={' '.join(str(x) for x in sw)}\n\n")
+        f.write("# Single-line for tuner_cli --weights (FIRST weights, backward compat)\n")
+        f.write(" ".join(str(x) for x in fw) + "\n")
 
     print(f"\n[3/3] Best weights written to {best_path}")
-    print("  Use: tuner_cli --weights " + " ".join(vals) + " --games 20")
-    print("\n  To resume: run the same command again (study stored in optuna_study.db)")
+    print()
+    print("To run with tuned weights:")
+    print("  set WEIGHTS_CFG=best_weights.cfg")
+    print()
+    print("To resume tuning: run the same command again")
     print("=" * 60)
 
 

@@ -34,6 +34,7 @@ set(UNIT_TESTS
     tests/unit/test_turn2_crash.cpp
     tests/unit/test_eval_upgrade.cpp
     tests/unit/test_tuner_weights.cpp
+tests/unit/test_side_weights.cpp
 )
 
 # GoogleTest via FetchContent
