@@ -92,7 +92,7 @@ void Protocol::handle_opp(const std::string& line) {
         pass_tracker_.opp_has_passed = false;
     }
 
-    board_.apply_move(opp_move);
+    static_cast<void>(board_.apply_move(opp_move));
 }
 
 void Protocol::handle_time(const std::string& line) {
@@ -129,7 +129,7 @@ void Protocol::handle_time(const std::string& line) {
         pass_tracker_.reset();
     }
 
-    board_.apply_move(best);
+    static_cast<void>(board_.apply_move(best));
     write_move(best);
 }
 

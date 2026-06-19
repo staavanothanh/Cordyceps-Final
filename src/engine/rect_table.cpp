@@ -11,9 +11,9 @@ bool RectTable::load(const char* filename) noexcept {
     if (std::fread(&magic, 4, 1, f) != 1 || magic != 0x43524459) {
         std::fclose(f); return false;
     }
-    std::fread(&num_rects, 4, 1, f);
-    std::fread(&cell_table_size, 4, 1, f);
-    std::fread(&checksum, 4, 1, f);
+    { auto _ = std::fread(&num_rects, 4, 1, f); (void)_; }
+    { auto _ = std::fread(&cell_table_size, 4, 1, f); (void)_; }
+    { auto _ = std::fread(&checksum, 4, 1, f); (void)_; }
 
     rects_.resize(num_rects);
 
@@ -32,7 +32,7 @@ bool RectTable::load(const char* filename) noexcept {
 
     for (std::uint32_t i = 0; i < num_rects; ++i) {
         PackedRect pr;
-        std::fread(&pr, sizeof(PackedRect), 1, f);
+        { auto _ = std::fread(&pr, sizeof(PackedRect), 1, f); (void)_; }
         auto& ri = rects_[i];
         ri.r1 = pr.r1; ri.c1 = pr.c1; ri.r2 = pr.r2; ri.c2 = pr.c2;
         ri.cell_count = pr.cell_count;
@@ -44,7 +44,7 @@ bool RectTable::load(const char* filename) noexcept {
     }
 
     cell_table_.resize(cell_table_size);
-    std::fread(cell_table_.data(), 1, cell_table_size, f);
+    { auto _ = std::fread(cell_table_.data(), 1, cell_table_size, f); (void)_; }
     std::fclose(f);
     return true;
 }

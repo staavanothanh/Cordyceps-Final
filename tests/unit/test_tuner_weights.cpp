@@ -36,13 +36,11 @@ TEST(TunerWeightsTest, SetTuneWeightsChangesEval) {
     board.eval_cache.my_territory = 1;
     board.eval_cache.opp_territory = 1;
 
-    // Default eval
-    int default_eval = evaluate(board, k_player_us);
+    // Default eval (just verify it doesn't crash)
+    static_cast<void>(evaluate(board, k_player_us));
 
     // Set extreme weights: territory*100, everything else 0
     set_tune_weights(0, 100, 0, 0, 0, 0, 0);
-    int territory_heavy = evaluate(board, k_player_us);
-
     // territory_diff = 1-1 = 0, so territory-heavy = 0*0 + 0*100 = 0? No difference.
     // Actually territory_diff is 0 because both have 1 territory cell.
     // Let's make a board with clear territory advantage.

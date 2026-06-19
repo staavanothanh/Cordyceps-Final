@@ -30,7 +30,7 @@ float TimeManager::margin_factor(int margin) noexcept {
     return 1.5f;
 }
 
-static float phase_pct(int live_count, const SideConfig& config) noexcept {
+static float phase_pct(int live_count, const SideConfig& /*config*/) noexcept {
     // Phase-based % of remaining per move (from log analysis of winning engines)
     // FIRST: 6% opening, 10% midgame, 12% late, 18% endgame
     // SECOND: adjusts via time_multiplier
