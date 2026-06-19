@@ -48,7 +48,6 @@ void Protocol::run() {
 void Protocol::handle_ready(const std::string& line) {
     i_am_first_ = (line.find("FIRST") != std::string::npos);
     our_player_ = i_am_first_ ? k_player_us : k_player_opp;
-    board_.current_player = k_player_us;
     pass_tracker_.reset();
     std::cout << "OK\n" << std::flush;
 }
@@ -71,6 +70,7 @@ void Protocol::handle_init(const std::string& line) {
     board_.recalc_live_mask();
     board_.my_mask = Bitboard::empty();
     board_.opp_mask = Bitboard::empty();
+    board_.current_player = our_player_;
 }
 
 void Protocol::handle_opp(const std::string& line) {

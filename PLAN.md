@@ -926,42 +926,56 @@ conn:        *0 (disabled — hurts without safety features)
 
 ---
 
-### ✅ Phase 5A Experiments (2026-06-19)
+### ✅ Phase 5C — Critical Protocol Bug Fix (2026-06-19)
 
-**Các thử nghiệm đã thực hiện (TDD workflow, tournament verify):**
+**Root cause**: `Protocol::handle_init` calls `board_ = Board{}` which sets `current_player = 0`.
+Vì `Protocol::handle_ready` set `board_.current_player = k_player_us` trước đó, nhưng
+`handle_init` tạo Board mới với `current_player = 0`. Kết quả: **SUỐT CẢ GAME current_player = 0**.
 
-| # | Thử nghiệm | Kết quả | Kết luận |
-|---|-----------|---------|----------|
-| 1 | **Steal × 1000 trong move ordering** (agent approach) | TOTAL 36%, FIRST 50%, SECOND 21% | ❌ Reverted. FIRST mất 86%→50%. Neutral-to-harmful. |
-| 2 | **Recapture + Vulnerability features** (O(170) scan trong evaluate) | TOTAL 40-50%, FIRST 64-86%, SECOND 14-21% | ✅ Kept. Agent 57% trong best run. Neutral-to-positive. |
-| 3 | **TT 2^20** (1M entries, 32 MiB) | TOTAL 46%, FIRST 71% | ❌ Reverted. Clear overhead +2ms/search làm giảm depth. |
+**Impact** (từ Phase 1 đến Phase 5C):
+- `apply_move(player=0)`: tất cả cells vào `opp_score` (vì `player != k_player_us` trong if-else)
+- `score_from_perspective(0) = opp_score - my_score`: LUÔN trả về POSITIVE (vì opp_score = total cells)
+- Engine LUÔN nghĩ mình đang thắng → pass sớm (giải thích game 2 BTC: pass ngay turn 1)
+- FIRST và SECOND **chơi giống hệt nhau** vì current_player = 0 không bao giờ đổi
+- Search hoạt động nhưng với eval signal bị bóp méo
 
-**Trạng thái cuối (kept changes):**
-- evaluate() có thêm recapture (opponent stealable cells *2) + vulnerability (our stealable cells *-2)
-- score_hint field trong Move struct (reuse từ enhance_root_moves)
-- Tất cả các thay đổi khác đã revert về baseline
+**Fix**: (`src/io/protocol.cpp`, 2 dòng thay đổi)
+- Remove `board_.current_player = k_player_us;` từ `handle_ready`
+- Add `board_.current_player = our_player_;` trong `handle_init` sau Board{}
 
-**QA Assessment — Engine hiện tại:**
-- **FIRST (86%)**: DOMINANT. Lợi thế snowball tận dụng triệt để.
-- **SECOND (14%)**: WEAK. Cần strategy overhaul, không phải tuning.
-- **Score_diff**: FIRST +36/game, SECOND -52/game.
-- **Depth**: 7.4 @ 500ms — bottleneck chính.
-- **Eval features**: 7 features (score, territory, corners, edges, live_adj, recapture, vulnerability).
-- **Sức mạnh so với đối thủ**: 50-50 với cả agent + superchym.
+**Kết quả sau fix (28 games vs agent + superchym):**
 
-**Bài học rút ra:**
-1. **Move ordering improvement không đủ** — steal × 1000 không giúp ích vì các moves được sắp xếp khác nhau mỗi node, không đồng nhất.
-2. **Eval features cải thiện nhẹ** — recapture/vulnerability giúp agent win rate tăng từ 50%→57% trong best run, nhưng không ổn định.
-3. **TT size không phải vấn đề** — vì clear mỗi search, TT lớn hơn chỉ gây overhead.
-4. **Depth 7.4 là bottleneck thực sự** — không có thay đổi nào tăng depth đáng kể.
-5. **SECOND yếu do search depth không đủ sâu** — không phải do time management hay eval.
+| Metric | Trước bug (current_player=0) | Sau fix |
+|--------|------------------------------|---------|
+| vs agent | 43% (99 games) | **79%** (14 games) |
+| vs superchym | 34% (99 games) | **86%** (14 games) |
+| TOTAL | 38% (38W 53L 8D) | **82%** (23W 4L 1D) |
+| As FIRST | 63% (31/49) | **100%** (14/14) |
+| As SECOND | 14% (7/50) | **64%** (9/14) |
 
-**Hướng đi tiếp theo (còn lại để cải thiện):**
-1. 🔄 **LMR aggressive** (mushroom-bot approach: R=2 base depth 5+) — duy nhất có thể tăng depth đáng kể
-2. 🔄 **Futility pruning depth ≤ 1** — skip branches không viable
-3. 🔄 **Move gen sau TT probe** — không gen moves nếu probe cho cutoff
-4. ❌ merge.py và submission package
-5. ❌ SPSA tuning loop
+**Tác động tới BTC submission**:
+Trước fix, BTC sample AIs:
+- Game 1 (Always Pass): WIN 4-0 ✓ — pass opponent cho engine ăn lãnh thổ
+- Game 2 (Always Pass): **LOSS 0-2** ✗ — engine PASS ngay turn 1 (score_from_perspective=0 luôn positive)
+- Game 3-4 (Sample Code): Mixed results — engine chơi suboptimal
+- Game 5-6+ (Pink Bean, Medium): Thua nặng — eval signal méo
+
+**Bài học**: `Board()` default constructor không set `current_player` đúng. Phải reset thủ công trong `handle_init`.
+Đây là bug tinh vi vì các unit tests tạo Board thủ công (set `current_player` bằng tay) → không phát hiện.
+Protocol test `ProtocolEndToEndTest` pass vì nó dùng flow đúng (READY → INIT → TIME) nhưng không test
+kết quả của search — chỉ verify move hợp lệ. Cần thêm test: sau INIT → TIME đầu tiên → verify current_player đúng.
+
+**Trạng thái hiện tại (sau Phase 5C):**
+- Engine **82%** vs agent + superchym (F100% S64%) — sẵn sàng resubmit BTC
+- FIRST: DOMINANT (100% win) — lợi thế đi trước tận dụng triệt để
+- SECOND: **64%** (từ 14%) — fix current_player tự động sửa SECOND
+- submission/main.cpp: 53.7 KiB, WSL 0 warnings, WSL: compile OK
+
+**Những gì còn lại có thể cải thiện:**
+1. **Endgame exact solver**: trigger ở live ≤ 12 OK nhưng cần verify threshold.
+2. **Recapture/vulnerability features**: code có sẵn nhưng đã revert do formula cancellation. Cần tune đúng.
+3. **Tuner weights**: tuning infrastructure sẵn sàng. Tune chỉ có giá trị khi đã có features ổn định.
+4. **BTC resubmit**: engine đã sẵn sàng. WSL compile OK, 0 warnings.
 
 ---
 
