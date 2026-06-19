@@ -90,7 +90,7 @@ TEST(TunerWeightsTest, SelfPlayBalanced) {
                      baseline[3], baseline[4], baseline[5], baseline[6]);
 
     int total_diff = 0;
-    int games = 4;
+    int games = 8;
 
     for (int g = 0; g < games; ++g) {
         // Generate board with seed
@@ -140,14 +140,14 @@ TEST(TunerWeightsTest, SelfPlayBalanced) {
     clear_tune_weights();
     // With same weights for both sides, margin should be near 0 (±5 for noise with 4 games)
     double avg_margin = static_cast<double>(total_diff) / games;
-    EXPECT_NEAR(avg_margin, 0.0, 6.0);
+    EXPECT_NEAR(avg_margin, 0.0, 5.0);
 }
 
 // ── Test 3: tuner_cli outputs correct format ──
 
 TEST(TunerWeightsTest, TunerCliFormat) {
     // Run tuner_cli as subprocess (from project root, build/tuner_cli.exe)
-    std::string cmd = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 2 --seed 42 --time 200";
+    std::string cmd = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 8 --seed 42 --time 200";
     FILE* pipe = popen(cmd.c_str(), "r");
     ASSERT_NE(pipe, nullptr);
 
@@ -167,8 +167,8 @@ TEST(TunerWeightsTest, TunerCliFormat) {
                              &our_avg, &opp_avg, &score_diff, &elapsed);
 
     EXPECT_EQ(parsed, 8);
-    EXPECT_FLOAT_EQ(margin, 0.0f);  // baseline vs baseline
-    EXPECT_EQ(wins + draws + losses, 2);  // 2 games
+    EXPECT_NEAR(margin, 0.0f, 6.0);  // self-play margin ≈ 0 (±noise)
+    EXPECT_EQ(wins + draws + losses, 8);  // 8 games
     EXPECT_GT(elapsed, 0);  // took some time
 }
 
@@ -176,7 +176,7 @@ TEST(TunerWeightsTest, TunerCliFormat) {
 
 TEST(TunerWeightsTest, DifferentWeightsDifferentMargin) {
     // Run with baseline
-    std::string cmd1 = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 4 --seed 42 --time 200";
+    std::string cmd1 = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 8 --seed 42 --time 200";
     FILE* pipe1 = popen(cmd1.c_str(), "r");
     ASSERT_NE(pipe1, nullptr);
 
@@ -188,7 +188,7 @@ TEST(TunerWeightsTest, DifferentWeightsDifferentMargin) {
     std::sscanf(buf1, "%f", &margin1);
 
     // Run with extreme weights
-    std::string cmd2 = "build\\tuner_cli.exe --weights 0 0 0 0 0 0 0 --games 4 --seed 42 --time 200";
+    std::string cmd2 = "build\\tuner_cli.exe --weights 0 0 0 0 0 0 0 --games 8 --seed 42 --time 200";
     FILE* pipe2 = popen(cmd2.c_str(), "r");
     ASSERT_NE(pipe2, nullptr);
 

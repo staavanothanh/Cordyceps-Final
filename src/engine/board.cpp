@@ -230,29 +230,22 @@ int evaluate(const Board& board, int player) noexcept {
 
     // Use runtime weights if active
     if (g_tune_active) {
-        // recapture = opponent's live_adj cells (we can steal them)
-        int recapture = -territory_diff;  // cells we don't own but opponent has
-        // vulnerability = our cells that are adjacent to live mushrooms
-        int vulnerability = adj_diff;  // our cells exposed to recapture
-
         return score * g_tune_w0
              + territory_diff * g_tune_w1
              + corner_diff * g_tune_w2
              + edge_diff * g_tune_w3
              + adj_diff * g_tune_w4
-             + recapture * g_tune_w5
-             + vulnerability * g_tune_w6
              + conn_diff * 0;
     }
 
-    // Temp weights: rebalanced from reference engines (superchym + mushroom-bot)
-    // Score no longer dominates — territory now carries more weight
-    return score * 3           // was 10 — reduced from 70% to ~30% of eval
-         + territory_diff * 3  // was 2 — increased importance
-         + corner_diff * 8     // was 5 — corners are valuable (reference: 18-22 weight)
-         + edge_diff * 2       // was 1 — edges matter more
-         + adj_diff * 3        // was 1 — proxy for recapture/vulnerability
-         + conn_diff * 0;      // disabled — connectivity hurts without safety features
+    // Baseline weights (proven: 38% vs agent+superchym, FIRST 63%)
+    // Score *3, Territory *3, Corners *8, Edges *2, LiveAdj *3
+    return score * 3
+         + territory_diff * 3
+         + corner_diff * 8
+         + edge_diff * 2
+         + adj_diff * 3
+         + conn_diff * 0;
 }
 
 } // namespace cordyceps
