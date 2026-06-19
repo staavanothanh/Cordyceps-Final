@@ -39,7 +39,14 @@ training_data.csv
 
 # Misc
 logs/
+tournament_logs/
 *.tmp
+temp*.txt
+input*.txt
+test_*.txt
+_test*.txt
+setting*.ini
+protocol_debug.txt
 .git_commit_msg.txt
 
 .commandcode/

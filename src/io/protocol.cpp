@@ -62,18 +62,37 @@ void Protocol::handle_init(const std::string& line) {
     for (int r = 0; r < k_rows; ++r) {
         unsigned long long row_val;
         if (!(iss >> row_val)) break;
-
         for (int c = k_cols - 1; c >= 0; --c) {
             int digit = static_cast<int>(row_val % 10);
             row_val /= 10;
-            int idx = r * k_cols + c;
-            board_.values[idx] = static_cast<std::int8_t>(digit);
+            board_.values[r * k_cols + c] = static_cast<std::int8_t>(digit);
         }
     }
-
     board_.recalc_live_mask();
     board_.my_mask = Bitboard::empty();
     board_.opp_mask = Bitboard::empty();
+}
+
+void Protocol::handle_opp(const std::string& line) {
+    std::istringstream iss(line);
+    std::string cmd;
+    int r1, c1, r2, c2, ms;
+    iss >> cmd >> r1 >> c1 >> r2 >> c2 >> ms;
+
+    Move opp_move{static_cast<std::int8_t>(r1), static_cast<std::int8_t>(c1),
+                  static_cast<std::int8_t>(r2), static_cast<std::int8_t>(c2)};
+
+    if (opp_move.is_pass()) {
+        if (pass_tracker_.last_pass_player != k_player_opp) {
+            pass_tracker_.opp_has_passed = true;
+            pass_tracker_.last_pass_player = k_player_opp;
+        }
+    } else {
+        pass_tracker_.last_pass_player = 0;
+        pass_tracker_.opp_has_passed = false;
+    }
+
+    board_.apply_move(opp_move);
 }
 
 void Protocol::handle_time(const std::string& line) {
@@ -91,8 +110,7 @@ void Protocol::handle_time(const std::string& line) {
 
     TimeManager tm;
     int margin = board_.score_from_perspective(our_player_);
-    int live_count = board_.live_count;
-    int search_time_ms = tm.get_budget(live_count, config, our_time, margin);
+    int search_time_ms = tm.get_budget(board_.live_count, config, our_time, margin);
 
     Move best;
     if (search_) {
@@ -113,29 +131,6 @@ void Protocol::handle_time(const std::string& line) {
 
     board_.apply_move(best);
     write_move(best);
-}
-
-void Protocol::handle_opp(const std::string& line) {
-    // OPP format: OPP <r1> <c1> <r2> <c2> <t>
-    std::istringstream iss(line);
-    std::string cmd;
-    int r1, c1, r2, c2, ms;
-    iss >> cmd >> r1 >> c1 >> r2 >> c2 >> ms;
-
-    Move opp_move{static_cast<std::int8_t>(r1), static_cast<std::int8_t>(c1),
-                  static_cast<std::int8_t>(r2), static_cast<std::int8_t>(c2)};
-
-    if (opp_move.is_pass()) {
-        if (pass_tracker_.last_pass_player != k_player_opp) {
-            pass_tracker_.opp_has_passed = true;
-            pass_tracker_.last_pass_player = k_player_opp;
-        }
-    } else {
-        pass_tracker_.last_pass_player = 0;
-        pass_tracker_.opp_has_passed = false;
-    }
-
-    board_.apply_move(opp_move);
 }
 
 void Protocol::handle_finish() {
