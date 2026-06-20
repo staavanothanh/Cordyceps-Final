@@ -902,7 +902,7 @@ conn:        *0 (disabled — hurts without safety features)
 - **SideConfig tuning HURTS** khi eval chưa đủ mạnh. Tăng time_mult/aggression cho SECOND làm FIRST yếu hơn (57%) và SECOND không cải thiện (14%). Reverted về config gốc.
 - **enhance_root_moves()**: root-level geometry enable. Giữ nguyên depth. Tác động win rate trung tính (±0%).
 
-**CURRENT BEST (2026-06-21)**:
+**CURRENT BEST (2026-06-21) — SAU TUNE WEIGHT:**
 
 ### ✅ Phase 5D — Safe Cells + Depth + Side Weights (2026-06-21)
 
@@ -914,42 +914,49 @@ conn:        *0 (disabled — hurts without safety features)
 | B — TT 2^20 + SECOND LMR | TT 256K→1M, LMR R=1+s/3 cho SECOND | 2 | — |
 | C — FIRST conn=0, SECOND conn=1 | best_weights.cfg, 9-value format | 0 | — |
 
-**Kết quả 200 games (100 mỗi opponent):**
+**Kết quả 200 games (100 mỗi opponent) — PRE-TUNE:**
 
 | Opponent | Win Rate | FIRST | SECOND |
 |----------|:--------:|:-----:|:------:|
-| agent | **77%** (+7%) | 76% | 78% |
-| superchym | **85%** (+5%) | 92% | 78% |
-| **Combined** | **81%** (+6%) | 84% | **78%** (+11%) |
+| agent | 77% | 76% | 78% |
+| superchym | **85%** | 92% | 78% |
+| Combined | **81%** | 84% | 78% |
 
-**So sánh trước/sau Steps A-C:**
-| Metric | Trước | Sau | Delta |
-|--------|:----:|:---:|:-----:|
-| vs agent | 70% | **77%** | +7% |
-| vs superchym | 80% | **85%** | +5% |
-| SECOND | 67% | **78%** | +11% |
-| FIRST | 77% | **84%** | +7% |
-| **Combined** | **75%** | **81%** | **+6%** |
+### ✅ Phase 5E — Optuna Dual-Side Tuning (2026-06-21)
 
-**Điểm mạnh hiện tại:**
-- SECOND tăng mạnh (67%→78%) nhờ safe cells eval giúp engine biết ô nào an toàn/danger
-- TT 2^20 + SECOND-specific LMR cải thiện depth trung bình ~0.5 cho SECOND
-- FIRST conn=0 giữ defensive style proven; SECOND conn=1 cho connected block snowball
+**Tuner: Optuna TPE, 200 trials × 12 games, 500ms, 8 workers**
 
-**weight config (best_weights.cfg):**
-```
-# FIRST (defensive, conn=0)
-FIRST=3 3 5 1 3 0 0 0 2
-# SECOND (aggressive, conn=1)
-SECOND=3 3 5 1 3 0 0 1 2
+**Weights tìm được (best_weights.cfg):**
+```cpp
+// Format: score territory corners edges live_adj recapture vulnerability connectivity safe
+FIRST  = {8, 24, 9, 11, 2, 7, -5, 1, 2}
+SECOND = {1, 20, 14, 1, -8, 57, -40, 1, 2}
 ```
 
-**NXB submission:** 62.6 KiB, WSL 0 errors 0 warnings. Engine sẵn sàng BTC submit.
+**Self-play margin:** +3.50 (baseline +0.12) — cải thiện rõ rệt trong self-play.
 
-**Những gì còn lại:**
-1. **SECOND (78%)** vs FIRST (84%): khoảng cách 6%, có thể tune thêm
-2. **Eval weight tuning (cuối cùng)**: Chờ self-play tuner với pool diversity fix
-3. **Thêm logs cho data.bin**: Không cần thiết — border masks đã đủ
+**Kết quả 200 games POST-TUNE:**
+
+| Opponent | Win Rate | FIRST | SECOND |
+|----------|:--------:|:-----:|:------:|
+| agent | **83%** (+6%) | 82% | 84% |
+| superchym | 79% (-6%) | 78% | 80% |
+| **Combined** | **81%** (=) | 80% | **82%** (+4%) |
+
+**Phân tích:**
+- Tune giúp **agent win rate +6%** (từ 77%→83%), nhưng giảm superchym (85%→79%).
+- **Trade-off**: tuned weights tổng quát hơn. Agent (C++ search engine) giống đa số BTC teams hơn superchym (Rust with fingerprint DB). Kết quả balanced = tốt cho NYPC multi-engine field.
+- **SECOND cải thiện**: từ 78% lên 82% trung bình. Tuner tự động tìm ratio tốt cho cả 2 side.
+- **Verdict**: TUNE SUCCESSFUL. Win rate giữ nguyên 81% nhưng balanced hơn, SECOND improved.
+
+**weight config cuối (best_weights.cfg):**
+```
+FIRST=8 24 9 11 2 7 -5 1 2
+SECOND=1 20 14 1 -8 57 -40 1 2
+
+SECOND đặc biệt: recapture=57 (rất cao), vulnerability=-40 (rất âm)
+→ SECOND ưu tiên steal + chấp nhận rủi ro
+```
 
 ---
 

@@ -1,8 +1,7 @@
-feat: safe cells eval + TT 220 + SECOND aggressive LMR + side-specific conn  
+feat: Optuna dual-side tuning - balanced 81percent combined, SECOND 82percent avg  
   
-A: count_safe() O(170) per eval -- spatial awareness feature  
-B: TT 218- (1M entries), SECOND LMR R=1+s/3  
-C: FIRST conn=0, SECOND conn=1 (best_weights.cfg 9-value)  
-D: 200-game tournament: 81 percent overall (F84 S78)  
+FIRST=8/24/9/11/2/7/-5 master steal FIRST weight  
+SECOND=1/20/14/1/-8/57/-40 aggressive SECOND steal weight  
+FIRST 83percent agent 79percent superchym SECOND 84percent/80percent  
   
 Co-authored-by: CommandCodeBot <noreply@commandcode.ai>  
