@@ -245,17 +245,25 @@ def main():
     log_dir = "tournament_logs"
     os.makedirs(log_dir, exist_ok=True)
 
-    cordy_cfg = {"command": "build/cordyceps.exe", "cwd": ".", "name": "cordyceps"}
-    opponents = [
-        {"command": "D:\\Learning_Programing\\NYPC-sample\\agent-i-think-change\\submissions\\qr-submit-v1\\agent.exe",
-         "cwd": "D:\\Learning_Programing\\NYPC-sample\\agent-i-think-change\\submissions\\qr-submit-v1",
-         "data_bin": "D:\\Learning_Programing\\NYPC-sample\\agent-i-think-change\\submissions\\qr-submit-v1\\data.bin",
-         "name": "agent"},
-        {"command": "D:\\Learning_Programing\\NYPC-sample\\superchym\\rust-bot\\submission_check.exe",
-         "cwd": "D:\\Learning_Programing\\NYPC-sample\\superchym\\rust-bot",
-         "data_bin": "D:\\Learning_Programing\\NYPC-sample\\superchym\\rust-bot\\data.bin",
-         "name": "superchym"},
-    ]
+    # Read config from tournament_config.ini
+    import configparser
+    cfg = configparser.ConfigParser()
+    cfg.read("tournament_config.ini")
+    cordy_cfg = {
+        "command": cfg["engines"]["cordyceps"].split(", ")[0],
+        "cwd": cfg["engines"]["cordyceps"].split(", ")[1] if ", " in cfg["engines"]["cordyceps"] else ".",
+        "name": "cordyceps"
+    }
+    opponents = []
+    for key in cfg["engines"]:
+        if key == "cordyceps": continue
+        parts = cfg["engines"][key].split(", ")
+        opp = {"command": parts[0], "cwd": parts[1] if len(parts) > 1 else ".", "name": key}
+        if len(parts) > 2:
+            opp["data_bin"] = parts[2]
+        elif len(parts) > 1:
+            opp["data_bin"] = os.path.join(parts[1], "data.bin")
+        opponents.append(opp)
     if args.opponent:
         opponents = [o for o in opponents if o["name"] == args.opponent]
 
