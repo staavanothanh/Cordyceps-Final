@@ -31,15 +31,17 @@ TUNER_EXE = PROJECT / "build" / "tuner_cli.exe"
 WEIGHT_NAMES = ["score", "territory", "corners", "edges", "live_adj", "recapture", "vulnerability"]
 
 # Per-weight ranges (min, max, default_from_baseline)
-# Reference-scaled from mushroom-bot, superchym, agent-i-think-change
+# Architect-verified from 4 reference engines (superchym, mushroom-bot,
+# agent-i-think-change, old-cdc). Ranges account for feature diff magnitude
+# (corner_diff max=4, live_adj_diff max=680, etc.)
 WEIGHT_RANGES = {
-    "score":         (0,  15, 3),
-    "territory":     (0,  15, 3),
-    "corners":       (0,  25, 8),
-    "edges":         (0,  10, 2),
-    "live_adj":      (-5, 10, 3),
-    "recapture":     (0,  15, 0),
-    "vulnerability": (-10, 5, 0),
+    "score":         (0,  10, 3),
+    "territory":     (0,  30, 3),
+    "corners":       (0,  55, 8),
+    "edges":         (0,  40, 2),
+    "live_adj":      (-10, 70, 3),
+    "recapture":     (0,  100, 0),
+    "vulnerability": (-80, 35, 0),
 }
 
 BASELINE = [3, 3, 8, 2, 3, 0, 0]
@@ -114,7 +116,7 @@ def objective(trial, games, time_ms, base_seed, verbose=False):
 def main():
     parser = argparse.ArgumentParser(description="Optuna eval weight tuner for Cordyceps (dual-side)")
     parser.add_argument("--trials", type=int, default=200, help="Optuna trials")
-    parser.add_argument("--games", type=int, default=8, help="Games per trial (4=fast, 8=standard, 16=precise)")
+    parser.add_argument("--games", type=int, default=12, help="Games per trial (8=fast, 12=standard, 20=precise)")
     parser.add_argument("--workers", type=int, default=8, help="Parallel workers")
     parser.add_argument("--time", type=int, default=500, help="ms/move")
     parser.add_argument("--seed", type=int, default=42, help="Base seed")
