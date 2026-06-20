@@ -83,7 +83,7 @@ TEST(TunerWeightsTest, SelfPlayBalanced) {
     ASSERT_TRUE(table.load("data.bin"));
     Zobrist zobrist;
 
-    const int baseline[7] = {3, 3, 8, 2, 3, 0, 0};
+    const int baseline[7] = {3, 3, 5, 1, 3, 0, 0};
     set_tune_weights(baseline[0], baseline[1], baseline[2],
                      baseline[3], baseline[4], baseline[5], baseline[6]);
 
@@ -145,7 +145,7 @@ TEST(TunerWeightsTest, SelfPlayBalanced) {
 
 TEST(TunerWeightsTest, TunerCliFormat) {
     // Run tuner_cli as subprocess (from project root, build/tuner_cli.exe)
-    std::string cmd = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 8 --seed 42 --time 200";
+    std::string cmd = "build\\tuner_cli.exe --weights 3 3 5 1 3 0 0 --games 8 --seed 42 --time 200";
     FILE* pipe = popen(cmd.c_str(), "r");
     ASSERT_NE(pipe, nullptr);
 
@@ -174,7 +174,7 @@ TEST(TunerWeightsTest, TunerCliFormat) {
 
 TEST(TunerWeightsTest, DifferentWeightsDifferentMargin) {
     // Run with baseline
-    std::string cmd1 = "build\\tuner_cli.exe --weights 3 3 8 2 3 0 0 --games 8 --seed 42 --time 200";
+    std::string cmd1 = "build\\tuner_cli.exe --weights 3 3 5 1 3 0 0 --games 8 --seed 42 --time 200";
     FILE* pipe1 = popen(cmd1.c_str(), "r");
     ASSERT_NE(pipe1, nullptr);
 

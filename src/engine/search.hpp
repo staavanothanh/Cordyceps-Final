@@ -40,7 +40,7 @@ struct SearchBenchmark {
 class Search {
 public:
     Search(const RectTable& table, const Zobrist& zobrist) noexcept
-        : table_(table), zobrist_(zobrist), tt_(18) {} // 2^18 = 256K entries
+        : table_(table), zobrist_(zobrist), tt_(20) {} // 2^20 = 1M entries
 
     [[nodiscard]] SearchResult simple_search(const Board& board, const SideConfig& config) noexcept;
     

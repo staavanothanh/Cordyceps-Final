@@ -144,14 +144,16 @@ namespace cordyceps {
 struct EvalWeights {
     int score{3};
     int territory{3};
-    int corners{8};
-    int edges{2};
+    int corners{5};
+    int edges{1};
     int live_adj{3};
     int recapture{0};
     int vulnerability{0};
+    int connectivity{1};  // NOTE: at END for backward-compat with 7-value config files
+    int safe{2};
 
     [[nodiscard]] static constexpr EvalWeights baseline() noexcept {
-        return EvalWeights{3, 3, 8, 2, 3, 0, 0};
+        return EvalWeights{3, 3, 5, 1, 3, 0, 0, 1, 2};
     }
 };
 
@@ -242,6 +244,9 @@ private:
 namespace cordyceps {
 [[nodiscard]] int evaluate(const Board& board, int player) noexcept;
 [[nodiscard]] int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept;
+
+// Count safe territory cells: owned cells with NO adjacent opponent-owned cells
+[[nodiscard]] int count_safe(const Board& board, int player) noexcept;
 
 // Runtime weight loading for tuning (thread-local, zero-overhead when not set)
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
@@ -484,13 +489,34 @@ bool load_weights_from_file(const char* path,
         // Skip comments/empty
         if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
 
-        int w[7];
-        if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d",
-                        &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
-            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
+        int w[9];
+        // Try 9-value format first: score territory corners edges live_adj recapture vulnerability connectivity safe
+        if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d %d %d",
+                        &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6], &w[7], &w[8]) == 9) {
+            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8]};
+            parsed_ok++;
+        } else if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6], &w[7]) == 8) {
+            // 8-value: safe defaults to 2
+            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], 2};
+            parsed_ok++;
+        } else if (std::sscanf(line, "FIRST=%d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            // Backward compat: 7-value, connectivity=1, safe=2
+            first_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], 1, 2};
+            parsed_ok++;
+        } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6], &w[7], &w[8]) == 9) {
+            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8]};
+            parsed_ok++;
+        } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d %d",
+                               &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6], &w[7]) == 8) {
+            // 8-value: safe defaults to 2
+            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], 2};
             parsed_ok++;
         } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d",
                                &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
+            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], 1, 2};
             second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
             parsed_ok++;
         }
@@ -507,6 +533,25 @@ void deploy_side_weights(bool is_first,
                      w.live_adj, w.recapture, w.vulnerability);
 }
 
+// ===== Safe territory: count owned cells with NO adjacent opponent cells =====
+int count_safe(const Board& board, int player) noexcept {
+    int safe = 0;
+    for (int i = 0; i < k_cells; ++i) {
+        if (board.owners[i] != player) continue;
+        int r = i / k_cols, c = i % k_cols;
+        bool has_opp = false;
+        int dr[] = {-1, 1, 0, 0};
+        int dc[] = {0, 0, -1, 1};
+        for (int d = 0; d < 4 && !has_opp; ++d) {
+            int nr = r + dr[d], nc = c + dc[d];
+            if (nr < 0 || nr >= k_rows || nc < 0 || nc >= k_cols) continue;
+            if (board.owners[nr * k_cols + nc] == -player) has_opp = true;
+        }
+        if (!has_opp) ++safe;
+    }
+    return safe;
+}
+
 int evaluate(const Board& board, int player, const EvalWeights* weights) noexcept {
     const auto& ec = board.eval_cache;
 
@@ -518,12 +563,18 @@ int evaluate(const Board& board, int player, const EvalWeights* weights) noexcep
     int adj_diff = ec.live_adj_my - ec.live_adj_opp;
     int conn_diff = ec.connectivity_my - ec.connectivity_opp;
 
+    // Compute safe cells (O(k_cells), no EvalCache dependency)
+    int safe_my = count_safe(board, k_player_us);
+    int safe_opp = count_safe(board, k_player_opp);
+    int safe_diff = safe_my - safe_opp;
+
     if (player == k_player_opp) {
         territory_diff = -territory_diff;
         corner_diff = -corner_diff;
         edge_diff = -edge_diff;
         adj_diff = -adj_diff;
         conn_diff = -conn_diff;
+        safe_diff = -safe_diff;
     }
 
     if (weights) {
@@ -532,7 +583,8 @@ int evaluate(const Board& board, int player, const EvalWeights* weights) noexcep
              + corner_diff * weights->corners
              + edge_diff * weights->edges
              + adj_diff * weights->live_adj
-             + conn_diff * 0;
+             + conn_diff * weights->connectivity
+             + safe_diff * weights->safe;
     }
 
     // Use runtime weights if active (tuner mode)
@@ -542,7 +594,8 @@ int evaluate(const Board& board, int player, const EvalWeights* weights) noexcep
              + corner_diff * g_tune_w2
              + edge_diff * g_tune_w3
              + adj_diff * g_tune_w4
-             + conn_diff * 0;
+             + conn_diff * 1  // connectivity fixed at 1 during tuning
+             + safe_diff * 2; // safe cells fixed at 2 during tuning
     }
 
     {
@@ -552,7 +605,8 @@ int evaluate(const Board& board, int player, const EvalWeights* weights) noexcep
              + corner_diff * b.corners
              + edge_diff * b.edges
              + adj_diff * b.live_adj
-             + conn_diff * 0;
+             + conn_diff * b.connectivity
+             + safe_diff * b.safe;
     }
 }
 
@@ -1112,7 +1166,7 @@ struct SearchBenchmark {
 class Search {
 public:
     Search(const RectTable& table, const Zobrist& zobrist) noexcept
-        : table_(table), zobrist_(zobrist), tt_(18) {} // 2^18 = 256K entries
+        : table_(table), zobrist_(zobrist), tt_(20) {} // 2^20 = 1M entries
 
     [[nodiscard]] SearchResult simple_search(const Board& board, const SideConfig& config) noexcept;
     
@@ -1441,7 +1495,8 @@ int Search::negamax(Board& board, int depth, int alpha, int beta, bool allow_pas
         bool is_full_search = false;
 
         if (searched >= 4 && depth >= 3 && !mv.is_pass() && mv != tt_move) {
-            int R = 1 + (searched / 4);
+            // SECOND gets more aggressive LMR (R larger) to search deeper in promising lines
+            int R = (aggression_ > 0.5f) ? (1 + searched / 3) : (1 + searched / 4);
             if (R > depth / 2) R = depth / 2;
             if (R < 1) R = 1;
 

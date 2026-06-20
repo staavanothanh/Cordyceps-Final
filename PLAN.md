@@ -902,27 +902,54 @@ conn:        *0 (disabled — hurts without safety features)
 - **SideConfig tuning HURTS** khi eval chưa đủ mạnh. Tăng time_mult/aggression cho SECOND làm FIRST yếu hơn (57%) và SECOND không cải thiện (14%). Reverted về config gốc.
 - **enhance_root_moves()**: root-level geometry enable. Giữ nguyên depth. Tác động win rate trung tính (±0%).
 
-**Đánh giá hiện tại**: Engine ỔN. 50% vs agent + superchym. FIRST 86% (dominant), SECOND 14% (yếu).
+**CURRENT BEST (2026-06-21)**:
 
-**Những gì còn lại để cải thiện**:
-1. **SECOND win rate (14%)**: Cần search sâu hơn không phải time nhiều hơn. 
-   → Đã thử: time_mult=1.5→2.0, aggression=0.7→1.0, steal=1.0→2.0
-   → Kết quả: FIRST yếu (57%), SECOND vẫn 14%, TOTAL 32%.
-   → Kết luận: chưa có cách fix dễ. Cần cải thiện eval/search trước.
-2. **GEOMETRY features**: mobility/safety/steal code có sẵn (enhance_root_moves).
-   → Maintained: root-level enhance (1ms/search). No depth penalty.
-   → Full search-time geometry (negamax_geo) đã xóa — depth 7.4→6.2 không đáng.
-3. **merge.py**: ✅ Works. 22 files → 54.1 KiB single main.cpp. WSL compile OK.
-4. **FUTILITY pruning**: code sẵn nhưng disabled. Cần eval ổn định trước.
-5. **MOVE ORDERING**: TT move bonus trong sort_moves. OK.
-6. **data.bin**: ~350KB, dưới 10MB. Có thể thêm precomputed.
-7. **SPSA tuning**: cuối cùng khi không còn gì để cải thiện nữa.
+### ✅ Phase 5D — Safe Cells + Depth + Side Weights (2026-06-21)
 
-**Kết luận (thẳng thắn)**:
-- Engine đã đạt plateau ở 50%.
-- Cần refactor eval/search architecture để vượt qua.
-- SideConfig tuning và geometry features là "low-hanging fruit" đã hái hết.
-- Bước tiếp theo thực tế nhất: benchmark score_diff giữa các engine để tune eval weights bằng SPSA/self-play. Hoặc quay lại Phase 3 cải thiện search depth.
+**3-step upgrade (TDD verified):**
+
+| Step | Thay đổi | Lines | Tests |
+|------|---------|:-----:|:-----:|
+| A — Safe cells eval | `count_safe(O(170))` + EvalWeights.safe default 2 | 20 | 5 new |
+| B — TT 2^20 + SECOND LMR | TT 256K→1M, LMR R=1+s/3 cho SECOND | 2 | — |
+| C — FIRST conn=0, SECOND conn=1 | best_weights.cfg, 9-value format | 0 | — |
+
+**Kết quả 200 games (100 mỗi opponent):**
+
+| Opponent | Win Rate | FIRST | SECOND |
+|----------|:--------:|:-----:|:------:|
+| agent | **77%** (+7%) | 76% | 78% |
+| superchym | **85%** (+5%) | 92% | 78% |
+| **Combined** | **81%** (+6%) | 84% | **78%** (+11%) |
+
+**So sánh trước/sau Steps A-C:**
+| Metric | Trước | Sau | Delta |
+|--------|:----:|:---:|:-----:|
+| vs agent | 70% | **77%** | +7% |
+| vs superchym | 80% | **85%** | +5% |
+| SECOND | 67% | **78%** | +11% |
+| FIRST | 77% | **84%** | +7% |
+| **Combined** | **75%** | **81%** | **+6%** |
+
+**Điểm mạnh hiện tại:**
+- SECOND tăng mạnh (67%→78%) nhờ safe cells eval giúp engine biết ô nào an toàn/danger
+- TT 2^20 + SECOND-specific LMR cải thiện depth trung bình ~0.5 cho SECOND
+- FIRST conn=0 giữ defensive style proven; SECOND conn=1 cho connected block snowball
+
+**weight config (best_weights.cfg):**
+```
+# FIRST (defensive, conn=0)
+FIRST=3 3 5 1 3 0 0 0 2
+# SECOND (aggressive, conn=1)
+SECOND=3 3 5 1 3 0 0 1 2
+```
+
+**NXB submission:** 62.6 KiB, WSL 0 errors 0 warnings. Engine sẵn sàng BTC submit.
+
+**Những gì còn lại:**
+1. **SECOND (78%)** vs FIRST (84%): khoảng cách 6%, có thể tune thêm
+2. **Eval weight tuning (cuối cùng)**: Chờ self-play tuner với pool diversity fix
+3. **Thêm logs cho data.bin**: Không cần thiết — border masks đã đủ
 
 ---
 

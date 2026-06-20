@@ -8,8 +8,8 @@ TEST(SideWeights, StructHasExpectedFields) {
     EvalWeights w{};
     EXPECT_EQ(w.score, 3);       // default = baseline
     EXPECT_EQ(w.territory, 3);
-    EXPECT_EQ(w.corners, 8);
-    EXPECT_EQ(w.edges, 2);
+    EXPECT_EQ(w.corners, 5);
+    EXPECT_EQ(w.edges, 1);
     EXPECT_EQ(w.live_adj, 3);
     EXPECT_EQ(w.recapture, 0);
     EXPECT_EQ(w.vulnerability, 0);
@@ -20,8 +20,8 @@ TEST(SideWeights, BaselineEqualsEvaluateDefaults) {
     // evaluate() with no weights uses score*3 + territory*3 + corners*8 + edges*2 + live_adj*3
     EXPECT_EQ(EvalWeights::baseline().score, 3);
     EXPECT_EQ(EvalWeights::baseline().territory, 3);
-    EXPECT_EQ(EvalWeights::baseline().corners, 8);
-    EXPECT_EQ(EvalWeights::baseline().edges, 2);
+    EXPECT_EQ(EvalWeights::baseline().corners, 5);
+    EXPECT_EQ(EvalWeights::baseline().edges, 1);
     EXPECT_EQ(EvalWeights::baseline().live_adj, 3);
     EXPECT_EQ(EvalWeights::baseline().recapture, 0);
     EXPECT_EQ(EvalWeights::baseline().vulnerability, 0);
@@ -100,11 +100,11 @@ TEST(SideWeights, LoadWeightsFromFile) {
     // Create a temp config file
     FILE* f = std::fopen("test_weights.cfg", "w");
     ASSERT_NE(f, nullptr);
-    std::fprintf(f, "FIRST=5 10 15 3 4 2 1\n");
-    std::fprintf(f, "SECOND=10 5 8 4 6 3 -2\n");
+    std::fprintf(f, "FIRST=5 10 15 3 4 2 1 0\n");
+    std::fprintf(f, "SECOND=10 5 8 4 6 3 -2 0\n");
     std::fclose(f);
 
-    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    EvalWeights fw{3,3,5,1,3,0,0,1}, sw{3,3,5,1,3,0,0,1};
     bool ok = load_weights_from_file("test_weights.cfg", fw, sw);
     EXPECT_TRUE(ok);
     EXPECT_EQ(fw.score, 5);
@@ -114,9 +114,11 @@ TEST(SideWeights, LoadWeightsFromFile) {
     EXPECT_EQ(fw.live_adj, 4);
     EXPECT_EQ(fw.recapture, 2);
     EXPECT_EQ(fw.vulnerability, 1);
+    EXPECT_EQ(fw.connectivity, 0);
     EXPECT_EQ(sw.score, 10);
     EXPECT_EQ(sw.territory, 5);
     EXPECT_EQ(sw.vulnerability, -2);
+    EXPECT_EQ(sw.connectivity, 0);
 
     std::remove("test_weights.cfg");
 }
@@ -126,11 +128,11 @@ TEST(SideWeights, DeploySideWeightsAffectsEval) {
     // Create a temp config
     FILE* f = std::fopen("test_deploy.cfg", "w");
     ASSERT_NE(f, nullptr);
-    std::fprintf(f, "FIRST=10 0 0 0 0 0 0\n");  // score*10 only
-    std::fprintf(f, "SECOND=0 10 0 0 0 0 0\n");  // territory*10 only
+    std::fprintf(f, "FIRST=10 0 0 0 0 0 0 0\n");  // score*10 only
+    std::fprintf(f, "SECOND=0 10 0 0 0 0 0 0\n");  // territory*10 only
     std::fclose(f);
 
-    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    EvalWeights fw{3,3,5,1,3,0,0,1}, sw{3,3,5,1,3,0,0,1};
     ASSERT_TRUE(load_weights_from_file("test_deploy.cfg", fw, sw));
 
     // Deploy as FIRST
@@ -157,7 +159,7 @@ TEST(SideWeights, DeploySideWeightsAffectsEval) {
 
 // ── Test 8: Missing file returns false, baseline unchanged ──
 TEST(SideWeights, MissingFileReturnsFalse) {
-    EvalWeights fw{3,3,8,2,3,0,0}, sw{3,3,8,2,3,0,0};
+    EvalWeights fw{3,3,5,1,3,0,0,1}, sw{3,3,5,1,3,0,0,1};
     EvalWeights fw_before = fw, sw_before = sw;
     bool ok = load_weights_from_file("nonexistent.cfg", fw, sw);
     EXPECT_FALSE(ok);

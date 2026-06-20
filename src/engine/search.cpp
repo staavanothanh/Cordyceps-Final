@@ -165,7 +165,8 @@ int Search::negamax(Board& board, int depth, int alpha, int beta, bool allow_pas
         bool is_full_search = false;
 
         if (searched >= 4 && depth >= 3 && !mv.is_pass() && mv != tt_move) {
-            int R = 1 + (searched / 4);
+            // SECOND gets more aggressive LMR (R larger) to search deeper in promising lines
+            int R = (aggression_ > 0.5f) ? (1 + searched / 3) : (1 + searched / 4);
             if (R > depth / 2) R = depth / 2;
             if (R < 1) R = 1;
 
