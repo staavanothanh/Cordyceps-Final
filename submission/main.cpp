@@ -4,6 +4,7 @@
 #include <bit>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <vector>
 #include <span>
 #include <chrono>
@@ -1850,19 +1851,43 @@ Protocol::Protocol() {
     std::cin.tie(nullptr);
     
     table_ = new RectTable();
-    if (table_->load("data.bin")) {
+    // Try loading data.bin from several relative paths
+    const char* dirs[] = {"", ".", "..", "./submission"};
+    bool loaded = false;
+    for (int i = 0; i < 4 && !loaded; ++i) {
+        char full[256];
+        if (dirs[i][0] == '\0') {
+            std::snprintf(full, sizeof(full), "data.bin");
+        } else {
+            std::snprintf(full, sizeof(full), "%s/data.bin", dirs[i]);
+        }
+        loaded = table_->load(full);
+    }
+    if (loaded) {
         zobrist_ = new Zobrist();
         search_ = new Search(*table_, *zobrist_);
+    } else {
+        std::fprintf(stderr, "[warn] data.bin not found — geometry disabled\n");
     }
     load_eval_weights();
 }
 
 void Protocol::load_eval_weights() {
     const char* env_path = std::getenv("WEIGHTS_CFG");
-    const char* path = env_path ? env_path : "best_weights.cfg";
-    weights_loaded_ = load_weights_from_file(path, first_weights_, second_weights_);
-    if (weights_loaded_) {
-        std::fprintf(stderr, "[weights] loaded from %s\n", path);
+    if (env_path) {
+        weights_loaded_ = load_weights_from_file(env_path, first_weights_, second_weights_);
+        if (weights_loaded_) std::fprintf(stderr, "[weights] loaded from %s\n", env_path);
+        return;
+    }
+    const char* dirs[] = {"", ".", "..", "./submission"};
+    for (int i = 0; i < 4 && !weights_loaded_; ++i) {
+        char full[256];
+        if (dirs[i][0] == '\0') {
+            std::snprintf(full, sizeof(full), "best_weights.cfg");
+        } else {
+            std::snprintf(full, sizeof(full), "%s/best_weights.cfg", dirs[i]);
+        }
+        weights_loaded_ = load_weights_from_file(full, first_weights_, second_weights_);
     }
 }
 
