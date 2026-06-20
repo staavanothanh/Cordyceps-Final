@@ -31,6 +31,22 @@ int Search::order_score(const Board& board, const Move& mv, int depth) noexcept 
     int h = history_[mv.r1][mv.c1][mv.r2][mv.c2];
     if (h > 0) return 50 + h;
 
+    // Steal detection via precomputed border masks (O(1), no cell scan)
+    if (steal_bonus_ > 0.1f) {
+        int id = table_.rect_id(mv.r1, mv.c1, mv.r2, mv.c2);
+        const auto& rect = table_.get_rect(id);
+        Bitboard border = rect.top_mask;
+        border |= rect.bottom_mask;
+        border |= rect.left_mask;
+        border |= rect.right_mask;
+        border &= board.opp_mask;
+        int steal_count = border.popcount();
+        if (steal_count > 0) {
+            int bonus = static_cast<int>(steal_count * 50 * steal_bonus_);
+            return 1000 + bonus;
+        }
+    }
+
     if (prefer_vertical_) {
         int height = mv.r2 - mv.r1 + 1;
         int width = mv.c2 - mv.c1 + 1;

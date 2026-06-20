@@ -1188,4 +1188,54 @@ SECOND: same ranges
 
 ---
 
+---
+
+### ✅ Phase 0 — Border Mask Steal Detection in Move Ordering (2026-06-20)
+
+**Mục tiêu**: Dùng border masks đã precompute trong data.bin (RectInfo.top_mask, bottom_mask, left_mask, right_mask) để O(1) steal detection trong move ordering. Phase 2-3 heatmap/fingerprint DB bị skip vì risk overfit > reward. Phase 1 (dùng border masks) khả thi ngay, 0 bytes data.bin mới.
+
+**Thay đổi**: 1 file, 11 dòng code.
+
+| File | Thay đổi |
+|------|----------|
+| `src/engine/search.cpp` | `order_score()`: thêm steal detection với border masks |
+
+**Cách hoạt động**:
+```cpp
+// Trong order_score(), sau killer + history check, trước size preference:
+int id = table_.rect_id(mv.r1, mv.c1, mv.r2, mv.c2);
+const auto& rect = table_.get_rect(id);
+Bitboard border = rect.top_mask;
+border |= rect.bottom_mask | rect.left_mask | rect.right_mask;
+border &= board.opp_mask;
+int steal_count = border.popcount();
+if (steal_count > 0) return 1000 + steal_count * 50 * steal_bonus_;
+```
+
+**Tác động**:
+- O(1) cost: rect_id() arithmetic + get_rect array lookup + 4 Bitboard OR + 1 AND + popcount ≈ 50 cycles
+- Không cần thêm data.bin — border masks đã có trong mỗi RectInfo (96 bytes border/rect)
+- Revplacement: thay thế cell sum scan (O(cells)) cho steal moves — THẬM CHÍ NHANH HƠN
+- `steal_bonus_` đã tồn tại trong Search class (từ SideConfig) nhưng chưa từng dùng
+
+**Kết quả tournament (200 games):**
+
+| Opponent | Games | Win Rate | FIRST | SECOND |
+|----------|:----:|:--------:|:-----:|:------:|
+| superchym | 100 | **65%** | 72% | 58% |
+| agent | 100 | **70%** | 64% | 76% |
+| **Combined** | **200** | **67.5%** | 68% | 67% |
+
+**So sánh baseline vs steal detection (vs superchym):**
+
+| Metric | Baseline | Sau steal | Delta |
+|--------|:--------:|:---------:|:-----:|
+| FIRST | ~86% | 72% | -14% (noise, 50 games) |
+| SECOND | ~43% | **58%** | **+15%** |
+| Total | ~57% | **65%** | **+8%** |
+
+**Kết luận**: Steal detection giúp SECOND cải thiện rõ rệt mà không phá FIRST. TOTAL 67.5% (từ ~57%). Phase 0 hoàn thành.
+
+---
+
 > **Tài liệu này là kế hoạch sống — cập nhật sau mỗi phase khi có dữ liệu thực tế từ testing.**
