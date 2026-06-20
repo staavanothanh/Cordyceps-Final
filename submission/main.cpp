@@ -250,7 +250,8 @@ namespace cordyceps {
 
 // Runtime weight loading for tuning (thread-local, zero-overhead when not set)
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
-                      int adj_w, int recapture_w, int vulnerability_w) noexcept;
+                      int adj_w, int recapture_w, int vulnerability_w,
+                      int connectivity_w = 1, int safe_w = 2) noexcept;
 void clear_tune_weights() noexcept;
 
 // Load eval weights from config file (format: "FIRST=w0..w6", "SECOND=w0..w6")
@@ -459,10 +460,13 @@ static thread_local int g_tune_w3 = 0;
 static thread_local int g_tune_w4 = 0;
 static thread_local int g_tune_w5 = 0;
 static thread_local int g_tune_w6 = 0;
+static thread_local int g_tune_w7 = 1;  // connectivity (default 1)
+static thread_local int g_tune_w8 = 2;  // safe (default 2)
 static thread_local bool g_tune_active = false;
 
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
-                      int adj_w, int recapture_w, int vulnerability_w) noexcept {
+                      int adj_w, int recapture_w, int vulnerability_w,
+                      int connectivity_w, int safe_w) noexcept {
     g_tune_w0 = score_w;
     g_tune_w1 = territory_w;
     g_tune_w2 = corner_w;
@@ -470,6 +474,8 @@ void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
     g_tune_w4 = adj_w;
     g_tune_w5 = recapture_w;
     g_tune_w6 = vulnerability_w;
+    g_tune_w7 = connectivity_w;
+    g_tune_w8 = safe_w;
     g_tune_active = true;
 }
 
@@ -517,7 +523,6 @@ bool load_weights_from_file(const char* path,
         } else if (std::sscanf(line, "SECOND=%d %d %d %d %d %d %d",
                                &w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6]) == 7) {
             second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6], 1, 2};
-            second_out = {w[0], w[1], w[2], w[3], w[4], w[5], w[6]};
             parsed_ok++;
         }
     }
@@ -530,7 +535,8 @@ void deploy_side_weights(bool is_first,
                           const EvalWeights& second_weights) noexcept {
     const auto& w = is_first ? first_weights : second_weights;
     set_tune_weights(w.score, w.territory, w.corners, w.edges,
-                     w.live_adj, w.recapture, w.vulnerability);
+                     w.live_adj, w.recapture, w.vulnerability,
+                     w.connectivity, w.safe);
 }
 
 // ===== Safe territory: count owned cells with NO adjacent opponent cells =====
@@ -594,8 +600,8 @@ int evaluate(const Board& board, int player, const EvalWeights* weights) noexcep
              + corner_diff * g_tune_w2
              + edge_diff * g_tune_w3
              + adj_diff * g_tune_w4
-             + conn_diff * 1  // connectivity fixed at 1 during tuning
-             + safe_diff * 2; // safe cells fixed at 2 during tuning
+             + conn_diff * g_tune_w7
+             + safe_diff * g_tune_w8;
     }
 
     {

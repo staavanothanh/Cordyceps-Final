@@ -117,7 +117,8 @@ namespace cordyceps {
 
 // Runtime weight loading for tuning (thread-local, zero-overhead when not set)
 void set_tune_weights(int score_w, int territory_w, int corner_w, int edge_w,
-                      int adj_w, int recapture_w, int vulnerability_w) noexcept;
+                      int adj_w, int recapture_w, int vulnerability_w,
+                      int connectivity_w = 1, int safe_w = 2) noexcept;
 void clear_tune_weights() noexcept;
 
 // Load eval weights from config file (format: "FIRST=w0..w6", "SECOND=w0..w6")

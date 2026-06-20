@@ -1,7 +1,8 @@
-feat: Optuna dual-side tuning - balanced 81percent combined, SECOND 82percent avg  
+refactor: remove hardcoded conn safe from tune path  
   
-FIRST=8/24/9/11/2/7/-5 master steal FIRST weight  
-SECOND=1/20/14/1/-8/57/-40 aggressive SECOND steal weight  
-FIRST 83percent agent 79percent superchym SECOND 84percent/80percent  
+- Fix SECOND 7-value parser bug (duplicate assignment overwrote data)  
+- Add g_tune_w7/w8 for connectivity+safe dynamic weights  
+- set_tune_weights now 9-param with defaults (backward compat)  
+- deploy_side_weights passes all 9 fields  
   
 Co-authored-by: CommandCodeBot <noreply@commandcode.ai>  
