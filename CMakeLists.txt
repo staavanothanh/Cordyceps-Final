@@ -7,8 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(/W4 /O2)
 else()
-    add_compile_options(-Wall -Wextra -O3 -march=native)
+    add_compile_options(-Wall -Wextra -O3 -march=native -static -static-libgcc -static-libstdc++)
 endif()
+
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 
 # Source files (for reference)
 # Built via add_executable below
